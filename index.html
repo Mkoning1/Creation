@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Oorsprong — beschavingssimulatie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #e7ebe5;
+  --panel: #f3f5f1;
+  --ink: #1d282c;
+  --ink-2: #56646a;
+  --rule: #c6cec6;
+  --accent: #2b5f86;
+  --bar: #dde3dc;
+  --sea: #223e58;
+  --font: "Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-c: "Barlow Semi Condensed", "Barlow", "Arial Narrow", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #151b1e; --panel: #1b2326; --ink: #dfe6e3; --ink-2: #8d9b9f;
+    --rule: #2d383c; --accent: #8db3d2; --bar: #263034; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #151b1e; --panel: #1b2326; --ink: #dfe6e3; --ink-2: #8d9b9f;
+  --rule: #2d383c; --accent: #8db3d2; --bar: #263034; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  background: var(--paper); color: var(--ink); font: 14px/1.4 var(--font);
+  font-variant-numeric: tabular-nums; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden;
+}
+button, select { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* bovenbalk */
+.top {
+  display: flex; align-items: center; gap: 22px; padding: 8px 16px; border-bottom: 1px solid var(--rule);
+  background: var(--panel); flex-wrap: wrap; min-height: 52px;
+}
+.brand { font: 600 19px/1 var(--font-c); letter-spacing: .02em; }
+.clock { display: flex; align-items: baseline; gap: 12px; color: var(--ink-2); }
+.clock b { font: 600 20px/1 var(--font-c); color: var(--ink); min-width: 3.1em; }
+.speed { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.speed button { background: none; border: 0; padding: 5px 11px; cursor: pointer; border-right: 1px solid var(--rule); min-width: 42px; }
+.speed button:last-child { border-right: 0; }
+.speed button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.spacer { flex: 1; }
+.status { color: var(--ink-2); font-size: 13px; }
+.newworld { display: flex; gap: 8px; align-items: center; }
+.newworld select { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 6px; }
+.btn { background: none; border: 1px solid var(--ink); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+.btn.armed { background: #a8432f; border-color: #a8432f; color: #fff; }
+
+/* hoofdindeling */
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 0; }
+.map { position: relative; min-width: 0; min-height: 0; background: var(--sea); overflow: hidden; }
+#map { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; display: block; }
+#map.dragging { cursor: grabbing; }
+.banner {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--panel); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 6px 12px; font-size: 13px; pointer-events: none;
+}
+.hint { position: absolute; left: 12px; bottom: 10px; color: #e8eef0; font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,.7); pointer-events: none; }
+.zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--panel); }
+.zoom button { background: none; border: 0; border-bottom: 1px solid var(--rule); width: 46px; height: 32px; cursor: pointer; font-size: 17px; line-height: 1; }
+.zoom button:last-child { border-bottom: 0; font-size: 13px; }
+
+/* zijpaneel */
+.side { border-left: 1px solid var(--rule); background: var(--panel); overflow-y: auto; min-height: 0; }
+.sec { padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+.sec h2 { margin: 0 0 10px; font: 600 15px/1.2 var(--font-c); letter-spacing: .01em; }
+.overview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 10px; }
+.overview .wide { grid-column: 1 / -1; flex-direction: row; align-items: baseline; gap: 8px; }
+.overview div { display: flex; flex-direction: column; }
+.overview span { color: var(--ink-2); font-size: 12px; }
+.overview b { font: 600 17px/1.2 var(--font-c); }
+
+.tribe { padding: 10px 0 12px; border-top: 1px solid var(--rule); cursor: pointer; }
+.tribe:first-child { border-top: 0; padding-top: 0; }
+.tribe .th { display: flex; align-items: center; gap: 8px; }
+.tribe .sw { width: 12px; height: 12px; border-radius: 2px; flex: none; }
+.tribe .nm { font: 600 16px/1.2 var(--font-c); }
+.tribe .era { margin-left: auto; color: var(--ink-2); font-size: 13px; }
+.tribe .tg { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 2px 8px; margin-top: 6px; }
+.tribe .tg div { display: flex; flex-direction: column; }
+.tribe .tg span { color: var(--ink-2); font-size: 12px; }
+.tribe .tg b { font-weight: 500; }
+.bar { height: 4px; background: var(--bar); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); }
+.tribe .sub { color: var(--ink-2); font-size: 12px; margin-top: 5px; }
+.tribe.dead { cursor: default; opacity: .62; padding-bottom: 8px; }
+.tribe.dead .tg, .tribe.dead .bar { display: none; }
+.tribe:hover:not(.dead) .nm { text-decoration: underline; text-underline-offset: 3px; }
+
+#graph { width: 100%; height: 130px; display: block; }
+
+.insp-empty { color: var(--ink-2); font-size: 13px; }
+.kv { display: grid; grid-template-columns: 92px 1fr; gap: 3px 10px; font-size: 13px; }
+.kv span { color: var(--ink-2); }
+.meter { display: flex; align-items: center; gap: 8px; }
+.meter .bar { flex: 1; margin: 0; height: 5px; }
+.insp-h { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.insp-h b { font: 600 16px/1.2 var(--font-c); }
+.insp-h .sw { width: 12px; height: 12px; border-radius: 6px; }
+.insp-actions { display: flex; gap: 8px; margin-top: 10px; }
+.insp-actions .btn { padding: 4px 10px; font-size: 13px; }
+.insp-actions .btn[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+
+#log { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+#log li { display: grid; grid-template-columns: 76px 8px 1fr; gap: 8px; align-items: baseline; padding: 3px 0; }
+#log .lt { color: var(--ink-2); font-size: 12px; }
+#log .ld { width: 8px; height: 8px; border-radius: 2px; align-self: center; }
+
+@media (max-width: 860px) {
+  body { overflow: auto; height: auto; display: block; }
+  main { grid-template-columns: 1fr; }
+  .map { height: 62vh; }
+  .side { border-left: 0; border-top: 1px solid var(--rule); overflow: visible; }
+  .top { gap: 12px; }
+  .hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">Oorsprong</div>
+  <div class="clock" id="clock"><b>06:00</b><span>Lente, dag 1</span><span>Jaar 1</span></div>
+  <div class="speed" id="speed" role="group" aria-label="Simulatiesnelheid">
+    <button data-s="0" title="Pauze (spatie)">Pauze</button>
+    <button data-s="1" title="Toets 1">1×</button>
+    <button data-s="3" title="Toets 2">3×</button>
+    <button data-s="10" title="Toets 3">10×</button>
+    <button data-s="30" title="Toets 4">30×</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="status" id="status"></div>
+  <div class="newworld">
+    <select id="tribeCount" aria-label="Aantal stammen">
+      <option value="2">2 stammen</option><option value="3">3 stammen</option>
+      <option value="4" selected>4 stammen</option><option value="5">5 stammen</option><option value="6">6 stammen</option>
+    </select>
+    <button class="btn" id="btnNew">Nieuwe wereld</button>
+  </div>
+</header>
+<main>
+  <section class="map" id="mapwrap">
+    <canvas id="map" tabindex="0" aria-label="Wereldkaart"></canvas>
+    <div class="banner" id="banner" hidden></div>
+    <div class="hint">Slepen om te verschuiven, scrollen om te zoomen, klikken om te inspecteren</div>
+    <div class="zoom">
+      <button data-z="in" aria-label="Inzoomen">+</button>
+      <button data-z="out" aria-label="Uitzoomen">−</button>
+      <button data-z="fit" aria-label="Hele kaart">Alles</button>
+    </div>
+  </section>
+  <aside class="side">
+    <section class="sec"><div class="overview" id="overview"></div></section>
+    <section class="sec"><h2>Stammen</h2><div id="tribes"></div></section>
+    <section class="sec"><h2>Bevolking</h2><canvas id="graph"></canvas></section>
+    <section class="sec"><h2>Inspectie</h2><div id="insp"></div>
+      <div class="insp-actions" id="inspActions" hidden>
+        <button class="btn" id="btnFollow" aria-pressed="false">Volgen</button>
+        <button class="btn" id="btnClear">Sluiten</button>
+      </div>
+    </section>
+    <section class="sec"><h2>Logboek</h2><ol id="log"></ol></section>
+  </aside>
+</main>
+
+<script>
+'use strict';
+// ===== SIM-START =====
+const W = 144, H = 100, N = W * H;
+const TPS = 10;                       // ticks per seconde op 1×
+const DAY = 600, SEASON_DAYS = 3, YEAR = DAY * SEASON_DAYS * 4;
+const SEASONS = ['Lente', 'Zomer', 'Herfst', 'Winter'];
+const WATER = 0, SAND = 1, GRASS = 2, FOREST = 3, ROCK = 4, DIRT = 5;
+const T_NAME = ['Water', 'Zand', 'Gras', 'Bos', 'Rots', 'Kale grond'];
+const WALK = [0, 1, 1, 1, 0, 1];
+const BUILDABLE = [0, 1, 1, 0, 0, 1];
+const BASE_COST = [99, 1.3, 1, 1.8, 99, 1.05];
+const ROAD_TH = [25, 70, 150, 260];
+const ROAD_F = [1, 0.9, 0.75, 0.62, 0.55];
+const DX = [1, -1, 0, 0, 1, 1, -1, -1], DY = [0, 0, 1, -1, 1, -1, 1, -1];
+const DC = [1, 1, 1, 1, 1.414, 1.414, 1.414, 1.414];
+const RES_NAME = { food: 'voedsel', wood: 'hout', stone: 'steen' };
+const SRC = {
+  tree: { res: 'wood', rate: 5, role: 'Houthakker', verb: 'Hakt hout' },
+  rock: { res: 'stone', rate: 7, role: 'Steenhouwer', verb: 'Hakt steen' },
+  bush: { res: 'food', rate: 4, role: 'Verzamelaar', verb: 'Plukt bessen' },
+  fish: { res: 'food', rate: 10, role: 'Visser', verb: 'Vist' },
+};
+const SOURCES = { food: ['bush', 'fish'], wood: ['tree'], stone: ['rock'] };
+const BDEF = {
+  center:   { n: 'Dorpskern', a: 'een dorpskern', w: 3, h: 3, cost: {}, work: 1, era: 0, cap: 4, claim: 9, drop: true },
+  hut:      { n: 'Hut', a: 'een hut', w: 1, h: 1, cost: { wood: 12 }, work: 110, era: 0, cap: 2, claim: 3 },
+  storage:  { n: 'Opslagplaats', a: 'een opslagplaats', w: 2, h: 2, cost: { wood: 25 }, work: 220, era: 0, claim: 5, drop: true },
+  farm:     { n: 'Akker', a: 'een akker', w: 3, h: 3, cost: { wood: 15 }, work: 120, era: 1, claim: 3 },
+  workshop: { n: 'Werkplaats', a: 'een werkplaats', w: 2, h: 2, cost: { wood: 30, stone: 15 }, work: 360, era: 1, claim: 4 },
+  house:    { n: 'Huis', a: 'een stenen huis', w: 2, h: 2, cost: { wood: 18, stone: 18 }, work: 300, era: 2, cap: 5, claim: 4 },
+  school:   { n: 'School', a: 'een school', w: 2, h: 2, cost: { wood: 35, stone: 30 }, work: 500, era: 2, claim: 5 },
+  outpost:  { n: 'Nederzetting', a: 'een nieuwe nederzetting', w: 3, h: 3, cost: { wood: 60, stone: 25 }, work: 700, era: 2, cap: 4, claim: 9, drop: true },
+  temple:   { n: 'Tempel', a: 'een tempel', w: 3, h: 3, cost: { wood: 40, stone: 110 }, work: 1300, era: 3, claim: 7 },
+  market:   { n: 'Markt', a: 'een markt', w: 3, h: 3, cost: { wood: 60, stone: 40 }, work: 650, era: 3, claim: 6, drop: true },
+  keep:     { n: 'Burcht', a: 'een burcht', w: 3, h: 3, cost: { wood: 80, stone: 200 }, work: 2200, era: 4, claim: 11 },
+};
+const ERAS = [
+  { n: 'Stamtijd', need: 0, pop: 0 },
+  { n: 'Landbouwtijd', need: 70, pop: 8, msg: 'ontdekt de landbouw' },
+  { n: 'Bronstijd', need: 260, pop: 16, msg: 'leert brons bewerken' },
+  { n: 'IJzertijd', need: 700, pop: 28, msg: 'betreedt de IJzertijd' },
+  { n: 'Koninkrijk', need: 1600, pop: 45, msg: 'kroont een koning en wordt een koninkrijk' },
+];
+const MILES = [10, 25, 50, 100, 150];
+const MAX_MOBS = 450;
+const TRIBE_NAMES = ['Arden', 'Morvik', 'Thalos', 'Keshet', 'Velmar', 'Oduna', 'Brakka', 'Sirenne', 'Halvor', 'Ystra', 'Corvan', 'Elmira', 'Tovuk', 'Nadir', 'Esker', 'Liv'];
+const COLORS = ['#c4524a', '#3d72b8', '#d19a2a', '#8b5fb3', '#2a9a93', '#c76a9a'];
+const SYL_A = ['Ar', 'Bel', 'Cor', 'Da', 'El', 'Fen', 'Gar', 'Hil', 'Is', 'Jor', 'Ka', 'Lin', 'Mar', 'Nor', 'Os', 'Per', 'Ru', 'Sil', 'Tor', 'Ul', 'Ve', 'Wil', 'Yr', 'Zan', 'Bram', 'Fo', 'Gil', 'Hen', 'Lo', 'Mei', 'Ti', 'Aud'];
+const SYL_B = ['a', 'e', 'o', 'en', 'ar', 'is', 'ul', 'wyn', 'dra', 'mir', 'rik', 'na', 'lin', 'ke', 'bert', 'da', 'mund', 'wen', 'gard', 'tje', 'ion', 'ra'];
+
+const rnd = Math.random;
+const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+const pick = a => a[Math.floor(rnd() * a.length)];
+const genName = () => pick(SYL_A) + pick(SYL_B);
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function makeNoise(rng) {
+  const p = []; for (let i = 0; i < 256; i++) p.push(i);
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  const P = new Uint8Array(512); for (let i = 0; i < 512; i++) P[i] = p[i & 255];
+  const V = new Float32Array(256); for (let i = 0; i < 256; i++) V[i] = rng();
+  const h = (a, b) => V[P[(P[a & 255] + b) & 255]];
+  return (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = h(xi, yi), b = h(xi + 1, yi), c = h(xi, yi + 1), d = h(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  };
+}
+function fbm(n, x, y, scale) {
+  let s = 0, amp = 0.55, f = 1 / scale, tot = 0;
+  for (let o = 0; o < 5; o++) { s += n(x * f, y * f) * amp; tot += amp; amp *= 0.5; f *= 2.03; }
+  return s / tot;
+}
+
+// Afgeleide (niet opgeslagen) toestand
+const D = {
+  bmap: new Int32Array(N), owner: new Int32Array(N), comp: new Int32Array(N), resv: new Int32Array(N),
+  roadLv: new Uint8Array(N), str: new Float32Array(N), dirtyFlag: new Uint8Array(N),
+  mobById: new Map(), bldById: new Map(), tribeById: new Map(),
+  dirty: [], fullDirty: true, terrDirty: true, bushList: [], fishList: [], mainComp: 0,
+};
+let S = null;
+
+function resetDerived() {
+  D.bmap.fill(-1); D.owner.fill(-1); D.comp.fill(-1); D.resv.fill(0); D.roadLv.fill(0); D.dirtyFlag.fill(0);
+  D.mobById.clear(); D.bldById.clear(); D.tribeById.clear(); D.dirty.length = 0; D.fullDirty = true; D.terrDirty = true; D.bushList = []; D.fishList = [];
+}
+function markDirty(i) {
+  if (D.fullDirty || D.dirtyFlag[i]) return;
+  D.dirtyFlag[i] = 1; D.dirty.push(i);
+  if (D.dirty.length > 6000) D.fullDirty = true;
+}
+function addLog(tr, m, k) {
+  S.logSeq = (S.logSeq || 0) + 1;
+  S.log.push({ seq: S.logSeq, t: S.tick, c: tr ? tr.color : null, m, k });
+  if (S.log.length > 200) S.log.splice(0, S.log.length - 200);
+}
+
+// ---- tijd ----
+const seasonIdx = () => Math.floor(S.tick / (DAY * SEASON_DAYS)) % 4;
+const hourOf = () => (6 + (S.tick % DAY) / DAY * 24) % 24;
+function isNightFor(m) { const h = hourOf(); return h >= 20.5 + m.nOff * 0.9 || h < 4.8 + m.nOff * 0.8; }
+function fmtShort(tk) {
+  const y = Math.floor(tk / YEAR) + 1, s = SEASONS[Math.floor(tk / (DAY * SEASON_DAYS)) % 4], d = Math.floor(tk / DAY) % SEASON_DAYS + 1;
+  return `J${y} ${s.slice(0, 3).toLowerCase()} ${d}`;
+}
+
+// ---- kaart ----
+function roadLevel(w) { let l = 0; while (l < 4 && w >= ROAD_TH[l]) l++; return l; }
+function tileCost(i) { return BASE_COST[S.tile[i]] * ROAD_F[D.roadLv[i]]; }
+function computeComp() {
+  D.comp.fill(-1);
+  const q = new Int32Array(N); const sizes = []; let c = 0;
+  for (let s = 0; s < N; s++) {
+    if (D.comp[s] !== -1 || !WALK[S.tile[s]]) continue;
+    let h = 0, t = 0; q[t++] = s; D.comp[s] = c;
+    while (h < t) {
+      const i = q[h++], x = i % W, y = (i / W) | 0;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + DX[d], ny = y + DY[d];
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const ni = ny * W + nx;
+        if (D.comp[ni] === -1 && WALK[S.tile[ni]]) { D.comp[ni] = c; q[t++] = ni; }
+      }
+    }
+    sizes.push(t); c++;
+  }
+  let best = 0; for (let k = 1; k < sizes.length; k++) if (sizes[k] > sizes[best]) best = k;
+  D.mainComp = best;
+}
+function isShore(i) {
+  const x = i % W, y = (i / W) | 0;
+  for (let d = 0; d < 4; d++) { const nx = x + DX[d], ny = y + DY[d]; if (nx >= 0 && ny >= 0 && nx < W && ny < H && S.tile[ny * W + nx] !== WATER) return true; }
+  return false;
+}
+function rebuildLists() {
+  D.bushList = []; D.fishList = [];
+  for (let i = 0; i < N; i++) { if (S.bush[i] >= 0) D.bushList.push(i); if (S.tile[i] === WATER && isShore(i)) D.fishList.push(i); }
+}
+
+function genWorld(seed, nTribes) {
+  const rng = mulberry32(seed);
+  S = {
+    v: 1, seed, tick: 0, nextId: 1, tribeTarget: nTribes, speed: 1, harsh: false, lastNewTribe: 0, logSeq: 0,
+    tile: new Uint8Array(N), amt: new Uint16Array(N), bush: new Int8Array(N).fill(-1), wear: new Uint16Array(N), elev: new Uint8Array(N),
+    tribes: [], mobs: [], buildings: [], log: [], hist: [],
+  };
+  resetDerived();
+  const ne = makeNoise(rng), nm = makeNoise(rng), nb = makeNoise(rng);
+  const e = new Float32Array(N), mo = new Float32Array(N);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    let v = fbm(ne, x, y, 34);
+    const dx = x / (W - 1) * 2 - 1, dy = y / (H - 1) * 2 - 1;
+    const d = Math.sqrt(dx * dx + dy * dy) / Math.SQRT2;
+    v -= Math.max(0, d - 0.42) * 0.95;
+    e[i] = v; mo[i] = fbm(nm, x + 57, y + 91, 20);
+  }
+  const sorted = Float32Array.from(e).sort();
+  const q = p => sorted[Math.floor(p * (N - 1))];
+  const wT = q(0.30), sT = q(0.335), rT = q(0.925), lo = sorted[0];
+  const landM = []; for (let i = 0; i < N; i++) if (e[i] >= sT && e[i] < rT) landM.push(mo[i]);
+  landM.sort((a, b) => a - b);
+  const fT = landM[Math.floor(landM.length * 0.6)];
+  for (let i = 0; i < N; i++) {
+    const v = e[i];
+    if (v < wT) { S.tile[i] = WATER; S.elev[i] = Math.max(0, Math.min(255, ((v - lo) / (wT - lo)) * 255)); }
+    else if (v < sT) S.tile[i] = SAND;
+    else if (v >= rT) { S.tile[i] = ROCK; S.amt[i] = 45 + Math.floor(rng() * 40); }
+    else if (mo[i] > fT || rng() < 0.025) { S.tile[i] = FOREST; S.amt[i] = mo[i] > fT ? 16 + Math.floor(rng() * 14) : 8 + Math.floor(rng() * 6); }
+    else {
+      S.tile[i] = GRASS;
+      const x = i % W, y = (i / W) | 0;
+      if ((nb(x / 9, y / 9) > 0.62 && rng() < 0.16) || rng() < 0.004) S.bush[i] = 12 + Math.floor(rng() * 9);
+    }
+  }
+  for (let i = 0; i < N; i++) if (S.tile[i] === WATER && isShore(i)) S.amt[i] = 10 + Math.floor(rng() * 14);
+  computeComp(); rebuildLists();
+  for (let k = 0; k < nTribes; k++) {
+    const sp = findSettleSpot(rng, 36) || findSettleSpot(rng, 24) || findSettleSpot(rng, 12);
+    if (sp) { const tr = createTribe(sp.x, sp.y, 6); addLog(tr, `De stam ${tr.name} sticht een dorp`, 'tribe'); }
+  }
+  D.fullDirty = true; D.terrDirty = true;
+}
+
+function areaFree(x, y, w, h) {
+  if (x < 1 || y < 1 || x + w > W - 1 || y + h > H - 1) return false;
+  for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
+    const i = yy * W + xx;
+    if (!BUILDABLE[S.tile[i]] || D.bmap[i] >= 0 || D.owner[i] >= 0) return false;
+  }
+  return true;
+}
+function findSettleSpot(rng, minDist) {
+  let best = null, bs = -1e9;
+  const others = S.buildings.filter(b => !b.ruin && (b.type === 'center' || b.type === 'outpost'));
+  for (let k = 0; k < 700; k++) {
+    const x = 9 + Math.floor(rng() * (W - 18)), y = 9 + Math.floor(rng() * (H - 18));
+    if (!areaFree(x - 1, y - 1, 3, 3)) continue;
+    if (D.comp[y * W + x] !== D.mainComp) continue;
+    let dmin = 999;
+    for (const b of others) { const d = Math.hypot(b.x + 1 - x, b.y + 1 - y); if (d < dmin) dmin = d; }
+    if (dmin < minDist) continue;
+    let grass = 0, forest = 0, rock = 0, water = 0, bush = 0, owned = 0;
+    for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
+      const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      const i = yy * W + xx, t = S.tile[i];
+      if (t === GRASS || t === DIRT || t === SAND) grass++; else if (t === FOREST) forest++; else if (t === ROCK) rock++; else water++;
+      if (S.bush[i] > 0) bush++;
+      if (D.owner[i] >= 0) owned++;
+    }
+    if (owned > 0 || grass < 90 || forest < 10) continue;
+    const sc = Math.min(dmin, 70) * 1.5 + Math.min(forest, 50) * 0.3 + Math.min(rock, 12) * 1.2 + Math.min(water, 20) * 0.4 + Math.min(bush, 12) * 1.2 + rng() * 8;
+    if (sc > bs) { bs = sc; best = { x, y }; }
+  }
+  return best;
+}
+
+// ---- entiteiten ----
+const tribeById = id => D.tribeById.get(id);
+function centersOf(tr) { return S.buildings.filter(b => b.t === tr.id && b.done && !b.ruin && (b.type === 'center' || b.type === 'outpost')); }
+function mainCenter(tr) { return S.buildings.find(b => b.t === tr.id && b.done && !b.ruin && b.type === 'center') || centersOf(tr)[0] || null; }
+
+function createTribe(x, y, nMobs) {
+  const used = new Set(S.tribes.map(t => t.name));
+  const name = TRIBE_NAMES.find(n => !used.has(n)) || ('Stam ' + (S.tribes.length + 1));
+  const usedC = new Set(S.tribes.filter(t => t.alive).map(t => t.color));
+  const color = COLORS.find(c => !usedC.has(c)) || COLORS[S.tribes.length % COLORS.length];
+  const tr = {
+    id: S.nextId++, name, color, era: 0, know: 0, kRate: 0, stock: { food: 50, wood: 30, stone: 0 },
+    alive: true, founded: S.tick, extinct: 0, pop: 0, adults: 0, popCap: 0, peak: 0, born: 0, died: 0, starve: 0,
+    tripAvg: 6, gx: x, gy: y, goal: null, cool: {}, mile: 0, built: {},
+  };
+  S.tribes.push(tr); D.tribeById.set(tr.id, tr);
+  placeBuilding(tr, 'center', x - 1, y - 1, true);
+  for (let k = 0; k < nMobs; k++) spawnMob(tr, x + ri(-2, 2), y + ri(-2, 2), YEAR * (1 + rnd() * 1.8));
+  assignHomes(tr);
+  tr.adults = nMobs;
+  return tr;
+}
+function spawnMob(tr, x, y, age) {
+  if (x < 0 || y < 0 || x >= W || y >= H || !WALK[S.tile[y * W + x]]) { const c = mainCenter(tr); if (c) { x = c.x + 1; y = c.y + 1; } }
+  const m = {
+    id: S.nextId++, t: tr.id, name: genName(), x: x + 0.5, y: y + 0.5, age: Math.floor(age),
+    life: Math.floor(YEAR * (4.5 + rnd() * 3)), hunger: 15 + rnd() * 25, hp: 100, task: null, path: null, pi: 0,
+    carry: 0, ctype: 'food', home: -1, role: '', asleep: false, nOff: rnd(), dead: false,
+  };
+  S.mobs.push(m); D.mobById.set(m.id, m); tr.pop++;
+  return m;
+}
+function killMob(m, cause) {
+  if (m.dead) return;
+  endTask(m);
+  m.dead = true; m.cause = cause; D.mobById.delete(m.id); S.deadFlag = true;
+  const tr = tribeById(m.t); tr.pop--; tr.died++; if (cause === 'honger') tr.starve++;
+}
+
+function placeBuilding(tr, type, x, y, done) {
+  const d = BDEF[type];
+  const b = { id: S.nextId++, t: tr.id, type, x, y, w: d.w, h: d.h, done: !!done, prog: done ? d.work : 0, placed: S.tick, ruin: false, stage: 0, grow: 0, worker: 0, unreach: 0 };
+  S.buildings.push(b); D.bldById.set(b.id, b);
+  for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) {
+    const i = yy * W + xx; D.bmap[i] = b.id;
+    if (S.bush[i] >= 0) { S.bush[i] = -1; markDirty(i); }
+  }
+  if (done) { recomputeTerritory(); if (d.cap) assignHomes(tr); }
+  return b;
+}
+function removeBuilding(b) {
+  for (let yy = b.y; yy < b.y + b.h; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) {
+    const i = yy * W + xx; if (D.bmap[i] === b.id) D.bmap[i] = -1;
+  }
+  const k = S.buildings.indexOf(b); if (k >= 0) S.buildings.splice(k, 1);
+  D.bldById.delete(b.id);
+}
+function completeBuilding(b, tr) {
+  const d = BDEF[b.type];
+  b.done = true; b.prog = d.work;
+  tr.built[b.type] = (tr.built[b.type] || 0) + 1;
+  const n = tr.built[b.type];
+  recomputeTerritory();
+  if (d.cap) assignHomes(tr);
+  if (b.type === 'outpost') addLog(tr, `${tr.name} sticht een nieuwe nederzetting`, 'build');
+  else if (['storage', 'workshop', 'school', 'temple', 'market', 'keep'].includes(b.type) || ((b.type === 'house' || b.type === 'farm') && n === 1))
+    addLog(tr, `${tr.name} voltooit ${d.a}`, 'build');
+}
+function recomputeTerritory() {
+  const str = D.str; str.fill(0); D.owner.fill(-1);
+  for (const b of S.buildings) {
+    if (!b.done || b.ruin) continue;
+    const r = BDEF[b.type].claim, cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(W - 1, Math.ceil(cx + r));
+    const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(H - 1, Math.ceil(cy + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.sqrt(dx * dx + dy * dy);
+      if (d > r) continue;
+      const s = r - d + 1, i = y * W + x;
+      if (s > str[i]) { str[i] = s; D.owner[i] = b.t; }
+    }
+  }
+  for (let i = 0; i < N; i++) if (S.tile[i] === WATER) D.owner[i] = -1;
+  D.terrDirty = true;
+}
+function assignHomes(tr) {
+  const houses = S.buildings.filter(b => b.t === tr.id && b.done && !b.ruin && BDEF[b.type].cap);
+  const cnt = new Map(); let cap = 0;
+  for (const h of houses) { cnt.set(h.id, 0); cap += BDEF[h.type].cap; }
+  tr.popCap = cap;
+  const homeless = [];
+  for (const m of S.mobs) {
+    if (m.t !== tr.id || m.dead) continue;
+    const h = cnt.has(m.home) ? D.bldById.get(m.home) : null;
+    if (h && cnt.get(h.id) < BDEF[h.type].cap) cnt.set(h.id, cnt.get(h.id) + 1);
+    else { m.home = -1; homeless.push(m); }
+  }
+  for (const m of homeless) {
+    let best = null, bd = 1e9;
+    for (const h of houses) {
+      if (cnt.get(h.id) >= BDEF[h.type].cap) continue;
+      const d = Math.abs(h.x - m.x) + Math.abs(h.y - m.y);
+      if (d < bd) { bd = d; best = h; }
+    }
+    if (!best) break;
+    m.home = best.id; cnt.set(best.id, cnt.get(best.id) + 1);
+  }
+}
+function freeHousing(tr) {
+  const houses = S.buildings.filter(b => b.t === tr.id && b.done && !b.ruin && BDEF[b.type].cap);
+  const cnt = new Map(houses.map(h => [h.id, 0]));
+  for (const m of S.mobs) if (m.t === tr.id && !m.dead && cnt.has(m.home)) cnt.set(m.home, cnt.get(m.home) + 1);
+  return houses.find(h => cnt.get(h.id) < BDEF[h.type].cap) || null;
+}
+
+// ---- padvinding (A*/Dijkstra met doelfunctie) ----
+const gS = new Float32Array(N), from = new Int32Array(N), seen = new Uint32Array(N), closed = new Uint32Array(N);
+let stamp = 0;
+const HCAP = N * 8, hI = new Int32Array(HCAP), hF = new Float32Array(HCAP); let hN = 0;
+function hpush(i, f) {
+  let k = hN++;
+  while (k > 0) { const p = (k - 1) >> 1; if (hF[p] <= f) break; hI[k] = hI[p]; hF[k] = hF[p]; k = p; }
+  hI[k] = i; hF[k] = f;
+}
+function hpop() {
+  const top = hI[0]; hN--;
+  if (hN > 0) {
+    const li = hI[hN], lf = hF[hN]; let k = 0;
+    for (;;) {
+      let c = 2 * k + 1; if (c >= hN) break;
+      if (c + 1 < hN && hF[c + 1] < hF[c]) c++;
+      if (hF[c] >= lf) break;
+      hI[k] = hI[c]; hF[k] = hF[c]; k = c;
+    }
+    hI[k] = li; hF[k] = lf;
+  }
+  return top;
+}
+function search(sx, sy, goal, maxNodes, tx, ty) {
+  if (++stamp >= 0xFFFFFFF0) { seen.fill(0); closed.fill(0); stamp = 1; }
+  const start = sy * W + sx; hN = 0;
+  const useH = tx !== undefined;
+  gS[start] = 0; seen[start] = stamp; from[start] = -1; hpush(start, 0);
+  let exp = 0;
+  while (hN > 0) {
+    const cur = hpop();
+    if (closed[cur] === stamp) continue;
+    closed[cur] = stamp;
+    if (goal(cur)) {
+      const path = []; let c = cur;
+      while (c !== start) { path.push(c); c = from[c]; }
+      path.reverse();
+      return { path, goal: cur };
+    }
+    if (++exp > maxNodes) return null;
+    const cx = cur % W, cy = (cur / W) | 0, g = gS[cur];
+    for (let d = 0; d < 8; d++) {
+      const nx = cx + DX[d], ny = cy + DY[d];
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+      const ni = ny * W + nx;
+      if (!WALK[S.tile[ni]] || closed[ni] === stamp) continue;
+      if (d >= 4 && (!WALK[S.tile[cy * W + nx]] || !WALK[S.tile[ny * W + cx]])) continue;
+      const ng = g + DC[d] * tileCost(ni);
+      if (seen[ni] !== stamp || ng < gS[ni]) {
+        seen[ni] = stamp; gS[ni] = ng; from[ni] = cur;
+        let f = ng;
+        if (useH) { const ax = Math.abs(nx - tx), ay = Math.abs(ny - ty); f += (Math.max(ax, ay) + 0.414 * Math.min(ax, ay)) * 0.85; }
+        if (hN < HCAP) hpush(ni, f);
+      }
+    }
+  }
+  return null;
+}
+
+// ---- mobs ----
+function endTask(m) {
+  const t = m.task;
+  if (t) {
+    if (t.ri !== undefined && t.ri >= 0 && D.resv[t.ri] === m.id) D.resv[t.ri] = 0;
+    if (t.k === 'farm') { const b = D.bldById.get(t.bid); if (b && b.worker === m.id) b.worker = 0; }
+  }
+  m.task = null; m.path = null; m.asleep = false;
+}
+function goTask(m, k, goal, maxNodes, tx, ty) {
+  const res = search(m.x | 0, m.y | 0, goal, maxNodes, tx, ty);
+  if (!res) return false;
+  m.task = { k, w: 0, gi: res.goal };
+  m.path = res.path.length ? res.path : null; m.pi = 0;
+  return true;
+}
+function freeRes(i, id) {
+  const r = D.resv[i];
+  if (!r || r === id) return true;
+  const o = D.mobById.get(r);
+  if (o && o.task && o.task.ri === i) return false;
+  D.resv[i] = 0; return true;
+}
+function isDrop(i, tid) {
+  const bi = D.bmap[i]; if (bi < 0) return false;
+  const b = D.bldById.get(bi);
+  return !!b && b.t === tid && b.done && !b.ruin && !!BDEF[b.type].drop;
+}
+const gatherMult = tr => (1 + tr.era * 0.12) * (tr.built.workshop ? 1.25 : 1);
+const buildMult = tr => (1 + tr.era * 0.1) * (tr.built.workshop ? 1.2 : 1);
+const carryCap = tr => 6 + tr.era * 2;
+
+function moveAlong(m) {
+  const i = m.path[m.pi];
+  const gx = (i % W) + 0.5, gy = ((i / W) | 0) + 0.5;
+  const dx = gx - m.x, dy = gy - m.y, d = Math.hypot(dx, dy);
+  const cur = (m.y | 0) * W + (m.x | 0);
+  const sp = (m.age < YEAR ? 0.09 : 0.13) / tileCost(cur);
+  if (d <= sp) {
+    m.x = gx; m.y = gy; m.pi++;
+    const t = S.tile[i];
+    if (t === GRASS || t === SAND || t === DIRT) {
+      const w = Math.min(2000, S.wear[i] + 4); S.wear[i] = w;
+      const l = roadLevel(w); if (l !== D.roadLv[i]) { D.roadLv[i] = l; markDirty(i); }
+    }
+    return m.pi >= m.path.length;
+  }
+  m.x += dx / d * sp; m.y += dy / d * sp;
+  return false;
+}
+
+function updateMob(m) {
+  const tr = tribeById(m.t);
+  m.age++;
+  const child = m.age < YEAR;
+  let hr = 0.1 * (child ? 0.6 : 1);
+  if (seasonIdx() === 3) hr *= S.harsh ? 1.35 : 1.12;
+  if (m.asleep) hr *= 0.6;
+  m.hunger += hr;
+  if (m.hunger >= 100) { m.hunger = 100; m.hp -= 0.06; if (m.hp <= 0) return killMob(m, 'honger'); }
+  else if (m.hunger < 60 && m.hp < 100) m.hp = Math.min(100, m.hp + 0.03);
+  if (m.age >= m.life) return killMob(m, 'ouderdom');
+  if (!m.task) chooseTask(m, tr, child);
+  if (m.task) runTask(m, tr);
+}
+
+function chooseTask(m, tr, child) {
+  m.asleep = false;
+  if (isNightFor(m)) { goHome(m, tr); return; }
+  if (!child && m.carry > 0) { if (goDeposit(m, tr)) return; m.carry = 0; }
+  if (m.hunger > 55 && goEat(m, tr)) return;
+  if (child) { m.role = 'Kind'; if (!goWander(m, tr, 4)) m.task = { k: 'idle', w: 0, t: 30 + rnd() * 30 }; return; }
+  const famine = tr.stock.food < tr.pop * 2;
+  if (!famine && tryBuild(m, tr)) return;
+  if (tryFarm(m, tr)) return;
+  if (tryGather(m, tr)) return;
+  if (famine && tryBuild(m, tr)) return;
+  m.role = 'Zonder werk';
+  if (!goWander(m, tr, 6)) m.task = { k: 'idle', w: 0, t: 40 + rnd() * 40 };
+}
+
+function runTask(m, tr) {
+  const t = m.task;
+  if (t.k !== 'home' && t.k !== 'sleep' && t.k !== 'deposit' && t.k !== 'eat' && isNightFor(m)) { endTask(m); return; }
+  if (m.hunger > 88 && tr.stock.food >= 2 && (t.k === 'build' || t.k === 'farm' || t.k === 'idle' || t.k === 'wander' || (t.k === 'gather' && !t.eat))) {
+    if (t.k === 'gather') { finishGather(m, tr, t); return; }
+    endTask(m); return;
+  }
+  if (m.path) { if (!moveAlong(m)) return; m.path = null; }
+  switch (t.k) {
+    case 'gather': doGather(m, tr, t); break;
+    case 'deposit': doDeposit(m, tr, t); break;
+    case 'eat': doEat(m, tr); break;
+    case 'build': doBuild(m, tr, t); break;
+    case 'farm': doFarm(m, tr, t); break;
+    case 'home': m.task = { k: 'sleep', w: 0 }; m.asleep = true; break;
+    case 'sleep': if (!isNightFor(m)) endTask(m); break;
+    case 'wander': case 'idle': if (--t.t <= 0) endTask(m); break;
+  }
+}
+
+function goHome(m, tr) {
+  let home = D.bldById.get(m.home);
+  if (!home || home.ruin || !home.done || home.t !== tr.id) {
+    let bd = 1e9; home = null;
+    for (const c of centersOf(tr)) { const d = Math.abs(c.x - m.x) + Math.abs(c.y - m.y); if (d < bd) { bd = d; home = c; } }
+  }
+  const sleepHere = () => { m.task = { k: 'sleep', w: 0 }; m.asleep = true; };
+  if (!home) return sleepHere();
+  const hid = home.id;
+  if (D.bmap[(m.y | 0) * W + (m.x | 0)] === hid) return sleepHere();
+  if (!goTask(m, 'home', i => D.bmap[i] === hid, 9000, home.x + (home.w >> 1), home.y + (home.h >> 1))) sleepHere();
+}
+function goWander(m, tr, r) {
+  const a = D.bldById.get(m.home) || mainCenter(tr);
+  if (!a) return false;
+  const tx = a.x + ri(-r, r + a.w - 1), ty = a.y + ri(-r, r + a.h - 1);
+  if (tx < 0 || ty < 0 || tx >= W || ty >= H) return false;
+  const target = ty * W + tx;
+  if (!WALK[S.tile[target]]) return false;
+  if (!goTask(m, 'wander', i => i === target, 600, tx, ty)) return false;
+  m.task.t = 20 + rnd() * 60;
+  return true;
+}
+function goDrop(m, tr, k) {
+  const drops = S.buildings.filter(b => b.t === tr.id && b.done && !b.ruin && BDEF[b.type].drop);
+  const dist = b => Math.hypot(b.x + b.w / 2 - m.x, b.y + b.h / 2 - m.y);
+  drops.sort((a, b) => dist(a) - dist(b));
+  for (let n = 0; n < Math.min(2, drops.length); n++) {
+    const b = drops[n], id = b.id;
+    if (goTask(m, k, i => D.bmap[i] === id, 6000, b.x + (b.w >> 1), b.y + (b.h >> 1))) return true;
+  }
+  return false;
+}
+function goDeposit(m, tr) {
+  if (!goDrop(m, tr, 'deposit')) return false;
+  m.task.len = m.path ? m.path.length : 0;
+  return true;
+}
+function goEat(m, tr) {
+  if (tr.stock.food >= 1 && goDrop(m, tr, 'eat')) return true;
+  for (const src of SOURCES.food) if ((tr.cool[src] || 0) <= S.tick && startGather(m, tr, src, true)) return true;
+  return false;
+}
+function census(tr) {
+  if (tr._ct === S.tick && tr._c) return tr._c;
+  const c = { gather: { food: 0, wood: 0, stone: 0 }, builders: 0, perSite: new Map() };
+  for (const o of S.mobs) {
+    if (o.t !== tr.id || !o.task) continue;
+    const k = o.task.k;
+    if (k === 'gather' && !o.task.eat) c.gather[o.task.res]++;
+    else if (k === 'build') { c.builders++; c.perSite.set(o.task.bid, (c.perSite.get(o.task.bid) || 0) + 1); }
+  }
+  tr._c = c; tr._ct = S.tick;
+  return c;
+}
+function tryBuild(m, tr) {
+  const sites = S.buildings.filter(b => b.t === tr.id && !b.done && !b.ruin);
+  if (!sites.length) return false;
+  const cs = census(tr), per = cs.perSite;
+  if (cs.builders >= Math.max(1, Math.round(tr.adults * 0.4))) return false;
+  let best = null, bs = 1e9;
+  for (const s of sites) {
+    const c = per.get(s.id) || 0; if (c >= 4) continue;
+    const sc = c * 30 + Math.hypot(s.x - m.x, s.y - m.y);
+    if (sc < bs) { bs = sc; best = s; }
+  }
+  if (!best) return false;
+  const id = best.id;
+  if (!goTask(m, 'build', i => D.bmap[i] === id, 9000, best.x + (best.w >> 1), best.y + (best.h >> 1))) { best.unreach++; return false; }
+  m.task.bid = id; m.role = 'Bouwer';
+  cs.builders++; per.set(id, (per.get(id) || 0) + 1);
+  return true;
+}
+function tryFarm(m, tr) {
+  const winter = seasonIdx() === 3;
+  let best = null, bd = 1e9;
+  for (const b of S.buildings) {
+    if (b.t !== tr.id || b.type !== 'farm' || !b.done || b.ruin || b.stage === 1) continue;
+    if (b.stage === 0 && winter) continue;
+    if (b.worker) {
+      const w = D.mobById.get(b.worker);
+      if (w && w.task && w.task.k === 'farm' && w.task.bid === b.id) continue;
+      b.worker = 0;
+    }
+    const d = Math.hypot(b.x - m.x, b.y - m.y);
+    if (d < bd) { bd = d; best = b; }
+  }
+  if (!best) return false;
+  const id = best.id;
+  if (!goTask(m, 'farm', i => D.bmap[i] === id, 9000, best.x + 1, best.y + 1)) return false;
+  m.task.bid = id; best.worker = m.id; m.role = 'Boer';
+  return true;
+}
+const stockCap = tr => 150 + 100 * (tr.drops || 1) + 50 * tr.era;
+function targets(tr) {
+  const g = tr.goal ? BDEF[tr.goal].cost : {}, cap = stockCap(tr) * 0.9;
+  return {
+    food: Math.min(cap, 20 + tr.pop * 7 + (seasonIdx() === 2 ? tr.pop * 5 : 0)),
+    wood: Math.min(cap, 30 + tr.era * 12 + (g.wood || 0)),
+    stone: Math.min(cap, (tr.era >= 1 ? 15 + tr.era * 20 : 0) + (g.stone || 0)),
+  };
+}
+function tryGather(m, tr) {
+  const tg = targets(tr), st = tr.stock, cs = census(tr), cnt = cs.gather;
+  const ws = [['rest', 0.3]];
+  for (const r of ['food', 'wood', 'stone']) {
+    if (tg[r] <= 0) continue;
+    const def = Math.max(0, tg[r] - st[r]) / tg[r];
+    ws.push([r, (0.06 + def * 2) / (1 + cnt[r] * 0.3)]);
+  }
+  while (ws.length) {
+    let tot = 0; for (const w of ws) tot += w[1];
+    let x = rnd() * tot, k = 0;
+    for (; k < ws.length - 1; k++) { x -= ws[k][1]; if (x <= 0) break; }
+    const r = ws.splice(k, 1)[0][0];
+    if (r === 'rest') {
+      m.role = 'Rust uit';
+      if (!(rnd() < 0.3 && goWander(m, tr, 5))) m.task = { k: 'idle', w: 0, t: 40 + rnd() * 60 };
+      return true;
+    }
+    for (const src of SOURCES[r]) {
+      if ((tr.cool[src] || 0) > S.tick) continue;
+      if (startGather(m, tr, src, false)) { cnt[r]++; return true; }
+      tr.cool[src] = S.tick + 300;
+    }
+  }
+  return false;
+}
+function adjStand(i, comp, tid) {
+  const x = i % W, y = (i / W) | 0;
+  for (let d = 0; d < 4; d++) {
+    const nx = x + DX[d], ny = y + DY[d]; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+    const j = ny * W + nx;
+    if (D.comp[j] === comp) { const o = D.owner[j]; if (o < 0 || o === tid) return j; }
+  }
+  return -1;
+}
+// Zoekt in ringen rond (cx, cy) naar de dichtstbijzijnde tegel die aan pred voldoet
+function ringFind(cx, cy, R, pred) {
+  const fx = rnd() < 0.5 ? 1 : -1, fy = rnd() < 0.5 ? 1 : -1, sw = rnd() < 0.5;
+  const test = (dx, dy) => {
+    if (sw) { const t = dx; dx = dy; dy = t; }
+    const x = cx + dx * fx, y = cy + dy * fy;
+    if (x < 0 || y < 0 || x >= W || y >= H) return -1;
+    const i = y * W + x; return pred(i) ? i : -1;
+  };
+  let i = test(0, 0); if (i >= 0) return i;
+  for (let r = 1; r <= R; r++) {
+    for (let d = -r; d <= r; d++) { if ((i = test(d, -r)) >= 0) return i; if ((i = test(d, r)) >= 0) return i; }
+    for (let d = -r + 1; d <= r - 1; d++) { if ((i = test(-r, d)) >= 0) return i; if ((i = test(r, d)) >= 0) return i; }
+  }
+  return -1;
+}
+function startGather(m, tr, src, eat) {
+  const id = m.id, tid = tr.id, comp = D.comp[(m.y | 0) * W + (m.x | 0)];
+  if (comp < 0) return false;
+  const okLand = i => { const o = D.owner[i]; return o < 0 || o === tid; };
+  let pred;
+  if (src === 'tree') pred = i => S.tile[i] === FOREST && S.amt[i] > 0 && D.comp[i] === comp && okLand(i) && freeRes(i, id);
+  else if (src === 'bush') pred = i => S.bush[i] > 0 && D.comp[i] === comp && okLand(i) && freeRes(i, id);
+  else if (src === 'rock') pred = i => S.tile[i] === ROCK && S.amt[i] > 0 && okLand(i) && freeRes(i, id) && adjStand(i, comp, tid) >= 0;
+  else pred = i => S.tile[i] === WATER && S.amt[i] > 0 && freeRes(i, id) && adjStand(i, comp, tid) >= 0;
+  const R = src === 'rock' ? 45 : 32, cx = m.x | 0, cy = m.y | 0, tried = [];
+  for (let k = 0; k < 3; k++) {
+    const i = ringFind(cx, cy, R, j => pred(j) && !tried.includes(j));
+    if (i < 0) return false;
+    const tx = i % W, ty = (i / W) | 0;
+    const goal = (src === 'tree' || src === 'bush') ? (j => j === i)
+      : (j => Math.abs(j % W - tx) + Math.abs(((j / W) | 0) - ty) === 1);
+    if (goTask(m, 'gather', goal, 4000, tx, ty)) {
+      Object.assign(m.task, { src, res: SRC[src].res, ri: i, eat });
+      D.resv[i] = id;
+      if (!eat) m.role = SRC[src].role;
+      if (m.carry > 0 && m.ctype !== SRC[src].res) m.carry = 0;
+      return true;
+    }
+    tried.push(i);
+  }
+  return false;
+}
+function takeUnit(src, i) {
+  if (src === 'tree') {
+    const a = --S.amt[i];
+    if (a === 0) { S.tile[i] = GRASS; markDirty(i); } else if (a === 14 || a === 6) markDirty(i);
+  } else if (src === 'rock') {
+    if (--S.amt[i] === 0) {
+      S.tile[i] = DIRT; markDirty(i);
+      const x = i % W, y = (i / W) | 0;
+      for (let d = 0; d < 4; d++) { const nx = x + DX[d], ny = y + DY[d]; if (nx >= 0 && ny >= 0 && nx < W && ny < H && D.comp[ny * W + nx] >= 0) { D.comp[i] = D.comp[ny * W + nx]; break; } }
+    }
+  } else if (src === 'bush') {
+    const b = --S.bush[i]; if (b === 0 || b === 4) markDirty(i);
+  } else if (src === 'fish') {
+    S.amt[i]--;
+  }
+}
+function resAvailable(src, i) {
+  if (src === 'tree') return S.tile[i] === FOREST && S.amt[i] > 0;
+  if (src === 'rock') return S.tile[i] === ROCK && S.amt[i] > 0;
+  if (src === 'bush') return S.bush[i] > 0;
+  return S.amt[i] > 0;
+}
+function doGather(m, tr, t) {
+  if (!resAvailable(t.src, t.ri)) { finishGather(m, tr, t); return; }
+  t.w += gatherMult(tr);
+  const rate = SRC[t.src].rate;
+  if (t.w < rate) return;
+  t.w -= rate;
+  takeUnit(t.src, t.ri);
+  m.carry++; m.ctype = t.res;
+  if ((t.eat && m.carry >= 3) || m.carry >= carryCap(tr) || !resAvailable(t.src, t.ri)) finishGather(m, tr, t);
+}
+function finishGather(m, tr, t) {
+  const eat = t.eat;
+  endTask(m);
+  if (eat) { m.hunger = Math.max(0, m.hunger - m.carry * 22); m.carry = 0; return; }
+  tr.gx += (m.x - tr.gx) * 0.08; tr.gy += (m.y - tr.gy) * 0.08;
+  if (m.carry > 0 && !goDeposit(m, tr)) m.carry = 0;
+}
+function doDeposit(m, tr, t) {
+  if (!isDrop((m.y | 0) * W + (m.x | 0), tr.id)) { endTask(m); return; }
+  tr.stock[m.ctype] = Math.min(Math.max(tr.stock[m.ctype], stockCap(tr)), tr.stock[m.ctype] + m.carry); m.carry = 0;
+  tr.tripAvg = tr.tripAvg * 0.92 + (t.len || 0) * 0.08;
+  if (m.hunger > 50 && tr.stock.food >= 1) eatFromStock(m, tr);
+  endTask(m);
+}
+function eatFromStock(m, tr) {
+  const need = m.age < YEAR ? 1 : 2;
+  const take = Math.min(tr.stock.food, need);
+  tr.stock.food -= take; m.hunger = Math.max(0, m.hunger - take * 30);
+}
+function doEat(m, tr) { eatFromStock(m, tr); endTask(m); }
+function doBuild(m, tr, t) {
+  const b = D.bldById.get(t.bid);
+  if (!b || b.done || b.ruin) { endTask(m); return; }
+  b.prog += buildMult(tr);
+  if (b.prog >= BDEF[b.type].work) { completeBuilding(b, tr); endTask(m); }
+}
+function doFarm(m, tr, t) {
+  const b = D.bldById.get(t.bid);
+  if (!b || b.ruin || b.stage === 1) { endTask(m); return; }
+  t.w++;
+  if (b.stage === 0 && t.w >= 50) { b.stage = 1; b.grow = 0; endTask(m); }
+  else if (b.stage === 2 && t.w >= 70) {
+    let y = 22 + tr.era * 4; if (b.bonus) { y = Math.round(y * 1.6); b.bonus = 0; }
+    tr.stock.food = Math.min(Math.max(tr.stock.food, stockCap(tr)), tr.stock.food + y); b.stage = 0; b.grow = 0; endTask(m);
+  }
+}
+
+// ---- stam-AI ----
+function canPlace(tid, type, x, y, w, h) {
+  if (x < 1 || y < 1 || x + w > W - 1 || y + h > H - 1) return false;
+  const comp = D.comp[(y * W + x)];
+  for (let yy = y - 1; yy <= y + h; yy++) for (let xx = x - 1; xx <= x + w; xx++) {
+    const i = yy * W + xx;
+    const inside = xx >= x && xx < x + w && yy >= y && yy < y + h;
+    const bi = D.bmap[i];
+    if (bi >= 0) {
+      if (inside || type !== 'farm') return false;
+      const o = D.bldById.get(bi); if (!o || o.type !== 'farm') return false;
+    }
+    const ow = D.owner[i]; if (ow >= 0 && ow !== tid) return false;
+    if (inside && (!BUILDABLE[S.tile[i]] || D.comp[i] < 0 || D.comp[i] !== comp)) return false;
+  }
+  return true;
+}
+function nearestDropDist(tr, x, y) {
+  let d = 1e9;
+  for (const b of S.buildings) if (b.t === tr.id && !b.ruin && BDEF[b.type].drop) d = Math.min(d, Math.hypot(b.x - x, b.y - y));
+  return d;
+}
+function foreignNear(tid, x, y, r) {
+  for (let dy = -r; dy <= r; dy += 2) for (let dx = -r; dx <= r; dx += 2) {
+    const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+    const o = D.owner[yy * W + xx]; if (o >= 0 && o !== tid) return true;
+  }
+  return false;
+}
+function richness(x, y, r) {
+  let s = 0;
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+    const i = yy * W + xx, t = S.tile[i];
+    if (t === FOREST) s += 1; else if (t === ROCK) s += 1.5; else if (t === GRASS) s += 0.15;
+    if (S.bush[i] > 0) s += 3;
+    if (D.owner[i] >= 0) s -= 1;
+  }
+  return s;
+}
+function findSpot(tr, type) {
+  const d = BDEF[type], centers = centersOf(tr);
+  if (!centers.length) return null;
+  const nOwn = S.buildings.reduce((a, b) => a + (b.t === tr.id && !b.ruin ? 1 : 0), 0);
+  const homeComp = D.comp[(centers[0].y + 1) * W + centers[0].x + 1];
+  let best = null, bs = 1e9;
+  for (let k = 0; k < (type === 'outpost' ? 160 : 90); k++) {
+    let ax, ay, rMin, rMax;
+    if (type === 'storage') { ax = tr.gx; ay = tr.gy; rMin = 0; rMax = 6; }
+    else if (type === 'outpost') { const c = pick(centers); ax = c.x + 1.5; ay = c.y + 1.5; rMin = 16; rMax = 28; }
+    else { const c = pick(centers); ax = c.x + 1.5; ay = c.y + 1.5; rMin = 2; rMax = Math.min(18, 5 + Math.sqrt(nOwn) * 1.5); }
+    const ang = rnd() * Math.PI * 2, r = rMin + Math.sqrt(rnd()) * (rMax - rMin);
+    const x = Math.round(ax + Math.cos(ang) * r - d.w / 2), y = Math.round(ay + Math.sin(ang) * r - d.h / 2);
+    if (!canPlace(tr.id, type, x, y, d.w, d.h)) continue;
+    if (D.comp[y * W + x] !== homeComp) continue;
+    let sc;
+    if (type === 'storage') { if (nearestDropDist(tr, x, y) < 8) continue; sc = r + rnd() * 2; }
+    else if (type === 'outpost') {
+      if (nearestDropDist(tr, x, y) < 14 || foreignNear(tr.id, x + 1, y + 1, 10)) continue;
+      sc = -richness(x + 1, y + 1, 7) + Math.abs(r - 20) * 0.5 + rnd() * 4;
+    }
+    else if (type === 'farm') sc = Math.abs(r - rMax * 0.75) + rnd() * 2;
+    else sc = r + rnd() * 2.5;
+    if (sc < bs) { bs = sc; best = { x, y }; }
+  }
+  return best;
+}
+const afford = (tr, c) => Object.keys(c).every(k => tr.stock[k] >= c[k]);
+
+function tribeThink(tr) {
+  let pop = 0, adults = 0;
+  for (const m of S.mobs) if (m.t === tr.id && !m.dead) { pop++; if (m.age >= YEAR) adults++; }
+  tr.pop = pop; tr.adults = adults; if (pop > tr.peak) tr.peak = pop;
+  if (pop === 0) { extinct(tr); return; }
+  while (tr.mile < MILES.length && pop >= MILES[tr.mile]) { addLog(tr, `${tr.name} telt ${MILES[tr.mile]} inwoners`, 'pop'); tr.mile++; }
+  const next = ERAS[tr.era + 1];
+  if (next && tr.know >= next.need && pop >= next.pop) { tr.era++; addLog(tr, `${tr.name} ${next.msg}`, 'era'); }
+
+  const mine = S.buildings.filter(b => b.t === tr.id && !b.ruin);
+  const count = {}, done = {};
+  for (const b of mine) { count[b.type] = (count[b.type] || 0) + 1; if (b.done) done[b.type] = (done[b.type] || 0) + 1; }
+  tr.kRate = 0.0011 * Math.sqrt(adults) + (done.school || 0) * 0.004 + (done.temple ? 0.008 : 0) + (done.market || 0) * 0.003 + (done.keep ? 0.008 : 0);
+  tr.drops = (done.center || 0) + (done.outpost || 0) + (done.storage || 0) + (done.market || 0);
+  assignHomes(tr);
+
+  let sites = mine.filter(b => !b.done);
+  for (const s of sites) {
+    if ((S.tick - s.placed > DAY * 3 && s.prog < 1) || s.unreach > 25) {
+      const c = BDEF[s.type].cost; for (const k in c) tr.stock[k] += c[k];
+      removeBuilding(s); count[s.type]--;
+    }
+  }
+  sites = sites.filter(s => D.bldById.has(s.id));
+  let pendCap = 0; for (const s of sites) pendCap += BDEF[s.type].cap || 0;
+  const cap = tr.popCap + pendCap;
+  const wants = [];
+  const needFarms = tr.era >= 1 && (count.farm || 0) < Math.ceil(pop / 5) && tr.stock.food < pop * 14;
+  const foodLow = tr.stock.food < pop * 6;
+  if (needFarms && (foodLow || (count.farm || 0) < pop / 9)) wants.push('farm');
+  if (pop >= cap - 1 && !(foodLow && needFarms)) { if (tr.era >= 2) wants.push('house'); wants.push('hut'); }
+  if (needFarms) wants.push('farm');
+  if (tr.tripAvg > 12 && (count.storage || 0) < Math.min(5, 1 + Math.floor(pop / 30))) wants.push('storage');
+  if (tr.era >= 1 && !count.workshop) wants.push('workshop');
+  if (tr.era >= 2 && (count.school || 0) < 1 + Math.floor(pop / 30)) wants.push('school');
+  if (tr.era >= 2 && (count.outpost || 0) < 3 && pop >= 24 * ((count.outpost || 0) + 1)) wants.push('outpost');
+  if (tr.era >= 3 && !count.temple) wants.push('temple');
+  if (tr.era >= 3 && !count.market) wants.push('market');
+  if (tr.era >= 4 && !count.keep) wants.push('keep');
+
+  tr.goal = null;
+  const maxSites = Math.min(4, 1 + Math.floor(adults / 10)) + (needFarms && foodLow ? 1 : 0);
+  if (sites.length >= maxSites) return;
+  for (const type of wants) {
+    if (!['hut', 'house', 'farm'].includes(type) && sites.some(s => s.type === type)) continue;
+    const d = BDEF[type];
+    if (!afford(tr, d.cost)) { if (!tr.goal) tr.goal = type; continue; }
+    const sp = findSpot(tr, type);
+    if (!sp) continue;
+    for (const k in d.cost) tr.stock[k] -= d.cost[k];
+    placeBuilding(tr, type, sp.x, sp.y, false);
+    break;
+  }
+}
+function extinct(tr) {
+  tr.alive = false; tr.extinct = S.tick;
+  for (const b of [...S.buildings]) {
+    if (b.t !== tr.id) continue;
+    if (!b.done) removeBuilding(b); else { b.ruin = true; b.ruinAt = S.tick; }
+  }
+  recomputeTerritory();
+  addLog(tr, `${tr.name} is uitgestorven`, 'tribe');
+}
+function births(tr) {
+  if (tr.pop >= tr.popCap || tr.adults < 2 || S.mobs.length >= MAX_MOBS) return;
+  if (tr.stock.food < 15 + tr.pop * 2) return;
+  if (rnd() > Math.min(0.05, 0.0012 * tr.adults)) return;
+  const h = freeHousing(tr) || mainCenter(tr); if (!h) return;
+  const m = spawnMob(tr, h.x + (h.w >> 1), h.y + (h.h >> 1), 0);
+  m.hunger = 10; m.home = BDEF[h.type].cap ? h.id : -1;
+  tr.stock.food -= 8; tr.born++;
+}
+
+function dailyUpdate() {
+  for (const tr of S.tribes) {
+    if (!tr.alive) continue;
+    if (tr.starve > 0) { addLog(tr, `Hongersnood bij ${tr.name}: ${tr.starve} ${tr.starve === 1 ? 'bewoner' : 'bewoners'} verhongerd`, 'death'); tr.starve = 0; }
+    const r = rnd();
+    if (tr.pop >= 14 && r < 0.012) {
+      const ms = S.mobs.filter(m => m.t === tr.id && !m.dead);
+      const k = Math.max(1, Math.round(ms.length * (0.08 + rnd() * 0.14)));
+      for (let j = 0; j < k; j++) { const idx = j + Math.floor(rnd() * (ms.length - j)); [ms[j], ms[idx]] = [ms[idx], ms[j]]; killMob(ms[j], 'ziekte'); }
+      addLog(tr, `Ziekte bij ${tr.name}: ${k} doden`, 'event');
+    } else if (r < 0.04 && tr.era >= 1) {
+      const farms = S.buildings.filter(b => b.t === tr.id && b.type === 'farm' && b.done && b.stage === 1);
+      if (farms.length) { for (const f of farms) { f.stage = 2; f.grow = 1; f.bonus = 1; } addLog(tr, `Uitzonderlijk goede oogst bij ${tr.name}`, 'event'); }
+    } else if (r < 0.065) {
+      const c = mainCenter(tr);
+      if (c) { const k = ri(2, 3); for (let j = 0; j < k; j++) spawnMob(tr, c.x + 1, c.y + 1, YEAR * (1.2 + rnd() * 1.5)); addLog(tr, `${k} nieuwkomers sluiten zich aan bij ${tr.name}`, 'event'); }
+    } else if (r < 0.078) {
+      const hs = S.buildings.filter(b => b.t === tr.id && b.done && !b.ruin && (b.type === 'hut' || b.type === 'house'));
+      if (hs.length >= 5) {
+        const b = pick(hs); removeBuilding(b); recomputeTerritory(); assignHomes(tr);
+        addLog(tr, `Brand bij ${tr.name}: ${b.type === 'hut' ? 'een hut' : 'een huis'} is verwoest`, 'event');
+      }
+    }
+  }
+  for (const b of [...S.buildings]) if (b.ruin && S.tick - b.ruinAt > YEAR * 1.5) removeBuilding(b);
+  const alive = S.tribes.filter(t => t.alive).length;
+  if (alive < S.tribeTarget && S.tick - S.lastNewTribe > DAY * 4 && rnd() < 0.3) {
+    const sp = findSettleSpot(rnd, 28) || findSettleSpot(rnd, 18);
+    if (sp) { const tr = createTribe(sp.x, sp.y, 5); S.lastNewTribe = S.tick; addLog(tr, `De stam ${tr.name} vestigt zich in het land`, 'tribe'); }
+  }
+}
+function seasonStart() {
+  if (seasonIdx() === 3) { S.harsh = rnd() < 0.22; if (S.harsh) addLog(null, 'Een strenge winter breekt aan', 'world'); }
+  else S.harsh = false;
+}
+function worldGrowth() {
+  for (let k = 0; k < 12; k++) {
+    const i = (rnd() * N) | 0, t = S.tile[i];
+    if (t === FOREST) { const a = S.amt[i]; if (a < 30) { S.amt[i] = a + 3; if ((a <= 6 && a + 3 > 6) || (a <= 14 && a + 3 > 14)) markDirty(i); } continue; }
+    if (t !== GRASS || D.bmap[i] >= 0 || S.bush[i] >= 0 || S.wear[i] > 8) continue;
+    const x = i % W, y = (i / W) | 0; let f = 0;
+    for (let d = 0; d < 8; d++) { const nx = x + DX[d], ny = y + DY[d]; if (nx >= 0 && ny >= 0 && nx < W && ny < H && S.tile[ny * W + nx] === FOREST) f++; }
+    if (f >= 2 && rnd() < 0.12) { S.tile[i] = FOREST; S.amt[i] = 4; markDirty(i); }
+    else if (f === 0 && rnd() < 0.003) { S.bush[i] = 3; D.bushList.push(i); markDirty(i); }
+  }
+}
+function regrowBushes() {
+  for (const i of D.bushList) {
+    const b = S.bush[i]; if (b < 0 || b >= 20) continue;
+    if (rnd() < 0.06) { S.bush[i] = b + 1; if (b === 0 || b === 4) markDirty(i); }
+  }
+  for (const i of D.fishList) if (S.amt[i] < 24 && rnd() < 0.05) S.amt[i]++;
+}
+function decayWear() {
+  for (let i = 0; i < N; i++) {
+    const w = S.wear[i]; if (!w) continue;
+    const nw = w - Math.max(1, w >> 6); S.wear[i] = nw;
+    const l = roadLevel(nw); if (l !== D.roadLv[i]) { D.roadLv[i] = l; markDirty(i); }
+  }
+}
+function sampleHist() {
+  const p = {}; for (const tr of S.tribes) if (tr.alive) p[tr.id] = tr.pop;
+  S.hist.push({ t: S.tick, p });
+  if (S.hist.length > 480) S.hist = S.hist.filter((_, i) => i % 2 === 0 || i === S.hist.length - 1);
+}
+
+function step() {
+  S.tick++;
+  const tk = S.tick;
+  if (tk % DAY === 0) dailyUpdate();
+  if (tk % (DAY * SEASON_DAYS) === 0) seasonStart();
+  const sea = seasonIdx();
+  if (sea !== 3) { if (tk % 5 === 0) worldGrowth(); if (tk % 60 === 0) regrowBushes(); }
+  if (tk % 200 === 0) decayWear();
+  const gm = [1, 1.25, 0.85, 0][sea];
+  if (gm > 0) for (const b of S.buildings) {
+    if (b.type === 'farm' && b.stage === 1 && b.done && !b.ruin) { b.grow += gm / (DAY * 1.6); if (b.grow >= 1) { b.grow = 1; b.stage = 2; } }
+  }
+  const ms = S.mobs;
+  for (let i = 0; i < ms.length; i++) { const m = ms[i]; if (!m.dead) updateMob(m); }
+  if (S.deadFlag) { S.mobs = S.mobs.filter(m => !m.dead); S.deadFlag = false; }
+  for (const tr of S.tribes) {
+    if (!tr.alive) continue;
+    tr.know += tr.kRate;
+    if (tk % 10 === tr.id % 10) births(tr);
+    if ((tk + tr.id * 7) % 50 === 0) tribeThink(tr);
+  }
+  if (tk % 300 === 0) sampleHist();
+}
+
+// ---- opslaan / laden ----
+function b64(ta) {
+  const u8 = new Uint8Array(ta.buffer, ta.byteOffset, ta.byteLength); let s = '';
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function unb64(str, Type) {
+  const s = atob(str), u8 = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
+  return new Type(u8.buffer);
+}
+function serialize() {
+  const mobs = S.mobs.map(m => Object.assign({}, m, { task: null, path: null, asleep: false }));
+  return JSON.stringify({
+    v: 1, seed: S.seed, tick: S.tick, nextId: S.nextId, tribeTarget: S.tribeTarget, speed: S.speed, harsh: S.harsh,
+    lastNewTribe: S.lastNewTribe, logSeq: S.logSeq,
+    tile: b64(S.tile), amt: b64(S.amt), bush: b64(S.bush), wear: b64(S.wear), elev: b64(S.elev),
+    tribes: S.tribes.map(t => { const o = Object.assign({}, t); delete o._c; delete o._ct; return o; }), mobs, buildings: S.buildings, log: S.log, hist: S.hist, savedAt: Date.now(),
+  });
+}
+function deserialize(o) {
+  S = Object.assign({}, o, {
+    tile: unb64(o.tile, Uint8Array), amt: unb64(o.amt, Uint16Array), bush: unb64(o.bush, Int8Array),
+    wear: unb64(o.wear, Uint16Array), elev: unb64(o.elev, Uint8Array),
+  });
+  delete S.savedAt;
+  resetDerived();
+  for (const tr of S.tribes) { D.tribeById.set(tr.id, tr); tr.pop = 0; }
+  for (const b of S.buildings) {
+    D.bldById.set(b.id, b); b.worker = 0;
+    for (let yy = b.y; yy < b.y + b.h; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) D.bmap[yy * W + xx] = b.id;
+  }
+  for (const m of S.mobs) { D.mobById.set(m.id, m); const tr = D.tribeById.get(m.t); if (tr) tr.pop++; }
+  for (let i = 0; i < N; i++) D.roadLv[i] = roadLevel(S.wear[i]);
+  computeComp(); rebuildLists(); recomputeTerritory();
+  for (const tr of S.tribes) if (tr.alive) assignHomes(tr);
+  D.fullDirty = true;
+}
+// ===== SIM-END =====
+
+// ===== WEERGAVE =====
+const $ = id => document.getElementById(id);
+const cv = $('map'), ctx = cv.getContext('2d');
+const TS = 8, TAU = Math.PI * 2;
+const terrCv = document.createElement('canvas'); terrCv.width = W * TS; terrCv.height = H * TS;
+const tctx = terrCv.getContext('2d');
+const ownCv = document.createElement('canvas'); ownCv.width = W * TS; ownCv.height = H * TS;
+const octx = ownCv.getContext('2d');
+const FONT_C = getComputedStyle(document.documentElement).getPropertyValue('--font-c') || 'sans-serif';
+
+const HSH = new Uint32Array(N), VAR = new Float32Array(N);
+for (let i = 0; i < N; i++) {
+  let h = Math.imul(i, 374761393) + 668265263 | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h = (h ^ (h >>> 16)) >>> 0;
+  HSH[i] = h; VAR[i] = ((h & 255) / 255 - 0.5);
+}
+const C = {
+  deep: [30, 56, 80], shallow: [66, 108, 132], sand: [204, 190, 148], grass: [124, 150, 90], grass2: [108, 136, 78],
+  forest: [94, 120, 72], tree: [52, 84, 46], tree2: [43, 72, 41], rock: [132, 131, 124], rockD: [102, 101, 96], rockL: [160, 158, 150],
+  dirt: [150, 136, 112], bush: [56, 90, 48], berry: [178, 52, 62],
+};
+const ROAD_A = [0, 0.26, 0.46, 0.66, 0.84];
+const rgb = (c, j = 0) => `rgb(${c[0] + j | 0},${c[1] + j | 0},${c[2] + j | 0})`;
+const TREE_P = [[2.4, 2.5], [5.7, 3.1], [3.9, 5.8]];
+
+function drawTile(i) {
+  const x = i % W, y = (i / W) | 0, px = x * TS, py = y * TS, t = S.tile[i], j = VAR[i] * 10, h = HSH[i], g = tctx;
+  if (t === WATER) {
+    const e = S.elev[i] / 255, k = e * e * e;
+    g.fillStyle = `rgb(${C.deep[0] + (C.shallow[0] - C.deep[0]) * k | 0},${C.deep[1] + (C.shallow[1] - C.deep[1]) * k | 0},${C.deep[2] + (C.shallow[2] - C.deep[2]) * k | 0})`;
+    g.fillRect(px, py, TS, TS);
+    if (k > 0.75 && (h & 3) === 0) { g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(px + (h >> 4 & 3) + 1, py + (h >> 6 & 3) + 2, 3, 1); }
+    return;
+  }
+  const base = t === SAND ? C.sand : t === ROCK ? C.rock : t === DIRT ? C.dirt : t === FOREST ? C.forest : C.grass;
+  g.fillStyle = rgb(base, j); g.fillRect(px, py, TS, TS);
+  if (t === GRASS && (h & 7) < 2) { g.fillStyle = rgb(C.grass2, j); g.fillRect(px + (h >> 3 & 5), py + (h >> 6 & 5), 2, 1); }
+  const lv = D.roadLv[i];
+  if (lv && t !== FOREST && t !== ROCK) { g.fillStyle = `rgba(186,166,126,${ROAD_A[lv]})`; g.fillRect(px, py, TS, TS); }
+  if (t === FOREST) {
+    const a = S.amt[i], n = a > 14 ? 3 : a > 6 ? 2 : 1;
+    for (let k = 0; k < n; k++) {
+      const jx = ((h >> (k * 4)) & 3) * 0.45 - 0.7, jy = ((h >> (k * 4 + 2)) & 3) * 0.45 - 0.7;
+      g.fillStyle = rgb((h >> (k + 9)) & 1 ? C.tree : C.tree2, j * 0.5);
+      g.beginPath(); g.arc(px + TREE_P[k][0] + jx, py + TREE_P[k][1] + jy, n === 1 ? 2.1 : 1.9 + (a > 20 ? 0.4 : 0), 0, TAU); g.fill();
+    }
+  } else if (t === ROCK) {
+    g.fillStyle = rgb(C.rockD, j); g.fillRect(px + (h & 3) + 1, py + (h >> 2 & 3) + 3, 3, 1); g.fillRect(px + (h >> 4 & 3) + 3, py + (h >> 6 & 3), 1, 2);
+    g.fillStyle = rgb(C.rockL, j); g.fillRect(px + (h >> 8 & 3) + 1, py + (h >> 10 & 3) + 1, 2, 1);
+  } else if (t === DIRT) {
+    g.fillStyle = 'rgba(80,70,55,.35)'; g.fillRect(px + (h & 5), py + (h >> 3 & 5), 1, 1); g.fillRect(px + (h >> 6 & 5) + 2, py + (h >> 9 & 5) + 1, 1, 1);
+  }
+  const bu = S.bush[i];
+  if (bu >= 0) {
+    g.fillStyle = rgb(C.bush); g.beginPath(); g.arc(px + 4, py + 4, 2.4, 0, TAU); g.fill();
+    if (bu > 4) { g.fillStyle = rgb(C.berry); g.fillRect(px + 3, py + 3, 1, 1); g.fillRect(px + 5, py + 4, 1, 1); g.fillRect(px + 3, py + 5, 1, 1); }
+  }
+}
+function drawOwnership() {
+  octx.clearRect(0, 0, ownCv.width, ownCv.height);
+  for (let i = 0; i < N; i++) {
+    const o = D.owner[i]; if (o < 0) continue;
+    const tr = D.tribeById.get(o); if (!tr) continue;
+    const x = i % W, y = (i / W) | 0, px = x * TS, py = y * TS;
+    octx.fillStyle = tr.color + '20'; octx.fillRect(px, py, TS, TS);
+    octx.fillStyle = tr.color + 'e0';
+    // grens als streeplijn, zoals op een topografische kaart
+    if (x === 0 || D.owner[i - 1] !== o) octx.fillRect(px, py + 1, 1.5, 5);
+    if (x === W - 1 || D.owner[i + 1] !== o) octx.fillRect(px + TS - 1.5, py + 1, 1.5, 5);
+    if (y === 0 || D.owner[i - W] !== o) octx.fillRect(px + 1, py, 5, 1.5);
+    if (y === H - 1 || D.owner[i + W] !== o) octx.fillRect(px + 1, py + TS - 1.5, 5, 1.5);
+  }
+}
+
+const view = { w: 0, h: 0, dpr: 1 };
+const cam = { x: W / 2, y: H / 2, z: 6 };
+let sel = null, follow = false;
+const zMin = () => Math.min(view.w / W, view.h / H) * 0.9;
+const clampZ = z => Math.max(zMin(), Math.min(48, z));
+function fitView() { cam.z = Math.min(view.w / W, view.h / H) * 0.98; cam.x = W / 2; cam.y = H / 2; }
+function camClamp() {
+  cam.z = clampZ(cam.z);
+  cam.x = Math.max(0, Math.min(W, cam.x)); cam.y = Math.max(0, Math.min(H, cam.y));
+}
+function darkness(h) {
+  if (h >= 7 && h < 18.5) return 0;
+  if (h >= 18.5 && h < 21.5) return (h - 18.5) / 3 * 0.5;
+  if (h >= 21.5 || h < 4.5) return 0.5;
+  return (1 - (h - 4.5) / 2.5) * 0.5;
+}
+const SEASON_TINT = ['rgba(150,210,120,0.04)', null, 'rgba(200,128,46,0.08)', 'rgba(236,241,246,0.24)'];
+const BFILL = {
+  hut: '#8c6a48', house: '#94553f', storage: '#80684c', workshop: '#5f6068', school: '#b29d77', farm: '#77603f',
+  center: '#7a6248', outpost: '#7a6248', temple: '#d6cebd', market: '#a88b5c', keep: '#7f7d77',
+};
+
+function drawBuilding(b, ox, oy, s) {
+  const tr = D.tribeById.get(b.t), col = tr ? tr.color : '#888', c = ctx;
+  const x = ox + b.x * s, y = oy + b.y * s, w = b.w * s, h = b.h * s, p = Math.max(0.5, s * 0.1);
+  const lw = Math.max(1, s * 0.08);
+  if (b.ruin) {
+    c.fillStyle = 'rgba(92,88,82,0.72)'; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+    if (s >= 4) { c.strokeStyle = 'rgba(40,38,34,.55)'; c.lineWidth = lw; c.beginPath(); c.moveTo(x + p, y + p); c.lineTo(x + w - p, y + h - p); c.moveTo(x + w - p, y + p); c.lineTo(x + p, y + h - p); c.stroke(); }
+    return;
+  }
+  if (!b.done) {
+    c.fillStyle = 'rgba(130,108,76,0.38)'; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+    c.setLineDash([Math.max(2, s * 0.25), Math.max(2, s * 0.18)]); c.strokeStyle = col; c.lineWidth = lw;
+    c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p); c.setLineDash([]);
+    const bh = Math.max(1.5, s * 0.14);
+    c.fillStyle = col; c.fillRect(x + p, y + h - p - bh, (w - 2 * p) * Math.min(1, b.prog / BDEF[b.type].work), bh);
+    return;
+  }
+  if (s < 3.2) { c.fillStyle = b.type === 'farm' ? farmColor(b) : BFILL[b.type]; c.fillRect(x, y, w, h); if (b.type !== 'farm') { c.fillStyle = col; c.fillRect(x + w * 0.3, y + h * 0.3, w * 0.4, h * 0.4); } return; }
+  const era = tr ? tr.era : 0;
+  switch (b.type) {
+    case 'farm': {
+      c.fillStyle = '#76603f'; c.fillRect(x + p * 0.5, y + p * 0.5, w - p, h - p);
+      const rows = b.w * 2;
+      c.fillStyle = b.stage === 0 ? 'rgba(60,45,28,.5)' : farmColor(b);
+      for (let k = 0; k < rows; k++) c.fillRect(x + p, y + p + (k + 0.25) * (h - 2 * p) / rows, w - 2 * p, (h - 2 * p) / rows * (b.stage === 0 ? 0.25 : 0.55));
+      c.strokeStyle = col + '99'; c.lineWidth = Math.max(1, s * 0.05); c.strokeRect(x + p * 0.5, y + p * 0.5, w - p, h - p);
+      break;
+    }
+    case 'hut': {
+      const q = s * 0.12;
+      c.fillStyle = BFILL.hut; c.fillRect(x + q, y + q, w - 2 * q, h - 2 * q);
+      c.strokeStyle = 'rgba(50,34,20,.55)'; c.lineWidth = Math.max(1, s * 0.06);
+      c.beginPath(); c.moveTo(x + q, y + q); c.lineTo(x + w - q, y + h - q); c.moveTo(x + w - q, y + q); c.lineTo(x + q, y + h - q); c.stroke();
+      c.strokeStyle = col; c.lineWidth = Math.max(1, s * 0.08); c.strokeRect(x + q, y + q, w - 2 * q, h - 2 * q);
+      break;
+    }
+    case 'center': case 'outpost': {
+      if (b.type === 'center' && era === 0) {
+        c.fillStyle = 'rgba(120,100,74,.75)'; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+        c.strokeStyle = col; c.lineWidth = lw; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+        c.fillStyle = '#8b8a84';
+        for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; c.beginPath(); c.arc(x + w / 2 + Math.cos(a) * s * 0.55, y + h / 2 + Math.sin(a) * s * 0.55, s * 0.12, 0, TAU); c.fill(); }
+        c.fillStyle = '#e0882e'; c.beginPath(); c.arc(x + w / 2, y + h / 2, s * 0.3, 0, TAU); c.fill();
+        c.fillStyle = '#f3c25a'; c.beginPath(); c.arc(x + w / 2, y + h / 2, s * 0.14, 0, TAU); c.fill();
+        break;
+      }
+      c.fillStyle = era >= 2 ? '#8f8b82' : BFILL.center; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      c.fillStyle = era >= 2 ? '#a7a296' : '#8d7254'; c.fillRect(x + s * 0.55, y + s * 0.55, w - s * 1.1, h - s * 1.1);
+      c.fillStyle = col; c.fillRect(x + w / 2 - s * 0.35, y + h / 2 - s * 0.35, s * 0.7, s * 0.7);
+      c.strokeStyle = col; c.lineWidth = lw * 1.2; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      break;
+    }
+    case 'house': {
+      c.fillStyle = BFILL.house; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      c.strokeStyle = 'rgba(60,30,22,.55)'; c.lineWidth = Math.max(1, s * 0.07);
+      c.beginPath(); c.moveTo(x + p, y + h / 2); c.lineTo(x + w - p, y + h / 2); c.stroke();
+      c.strokeStyle = col; c.lineWidth = lw; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      break;
+    }
+    case 'storage': {
+      c.fillStyle = BFILL.storage; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      c.fillStyle = '#9b8058'; const q = s * 0.38;
+      c.fillRect(x + s * 0.3, y + s * 0.3, q, q); c.fillRect(x + s * 1.2, y + s * 0.35, q, q); c.fillRect(x + s * 0.4, y + s * 1.2, q, q); c.fillRect(x + s * 1.15, y + s * 1.25, q, q);
+      c.strokeStyle = col; c.lineWidth = lw; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      break;
+    }
+    case 'workshop': {
+      c.fillStyle = BFILL.workshop; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      c.fillStyle = '#3c3d42'; c.fillRect(x + w - s * 0.7, y + s * 0.25, s * 0.4, s * 0.4);
+      c.fillStyle = '#e0882e'; c.fillRect(x + w - s * 0.6, y + s * 0.35, s * 0.2, s * 0.2);
+      c.strokeStyle = col; c.lineWidth = lw; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      break;
+    }
+    case 'school': {
+      c.fillStyle = BFILL.school; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      c.fillStyle = 'rgba(70,58,40,.45)';
+      for (let k = 0; k < 3; k++) c.fillRect(x + s * (0.35 + k * 0.5), y + s * 0.8, s * 0.25, s * 0.4);
+      c.strokeStyle = col; c.lineWidth = lw; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      break;
+    }
+    case 'temple': {
+      c.fillStyle = BFILL.temple; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      c.fillStyle = '#b4ab97';
+      for (let k = 0; k < 4; k++) { c.beginPath(); c.arc(x + s * (0.55 + k * 0.63), y + s * 0.5, s * 0.13, 0, TAU); c.fill(); c.beginPath(); c.arc(x + s * (0.55 + k * 0.63), y + h - s * 0.5, s * 0.13, 0, TAU); c.fill(); }
+      c.fillStyle = col; c.fillRect(x + w / 2 - s * 0.3, y + h / 2 - s * 0.3, s * 0.6, s * 0.6);
+      c.strokeStyle = col; c.lineWidth = lw; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      break;
+    }
+    case 'market': {
+      c.fillStyle = BFILL.market; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      for (let k = 0; k < 3; k++) { c.fillStyle = k % 2 ? '#e9e1cf' : col; c.fillRect(x + s * (0.35 + k * 0.85), y + s * 0.4, s * 0.6, s * 0.9); }
+      c.fillStyle = 'rgba(60,45,30,.35)'; c.fillRect(x + s * 0.35, y + s * 1.8, w - s * 0.7, s * 0.6);
+      c.strokeStyle = col; c.lineWidth = lw; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      break;
+    }
+    case 'keep': {
+      c.fillStyle = BFILL.keep; c.fillRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      c.fillStyle = '#a19d94'; c.fillRect(x + s * 0.7, y + s * 0.7, w - s * 1.4, h - s * 1.4);
+      c.fillStyle = '#65635e'; const tw = s * 0.75;
+      c.fillRect(x + p, y + p, tw, tw); c.fillRect(x + w - p - tw, y + p, tw, tw); c.fillRect(x + p, y + h - p - tw, tw, tw); c.fillRect(x + w - p - tw, y + h - p - tw, tw, tw);
+      c.fillStyle = col; c.fillRect(x + w / 2 - s * 0.25, y + h / 2 - s * 0.25, s * 0.5, s * 0.5);
+      c.strokeStyle = col; c.lineWidth = lw; c.strokeRect(x + p, y + p, w - 2 * p, h - 2 * p);
+      break;
+    }
+  }
+}
+function farmColor(b) {
+  if (b.stage === 0) return '#76603f';
+  const g = b.grow, a = [96, 142, 60], z = [204, 172, 82];
+  return `rgb(${a[0] + (z[0] - a[0]) * g | 0},${a[1] + (z[1] - a[1]) * g | 0},${a[2] + (z[2] - a[2]) * g | 0})`;
+}
+const RES_COL = { wood: '#7a5130', stone: '#a9a8a2', food: '#c0444f' };
+
+function render() {
+  if (D.fullDirty) { for (let i = 0; i < N; i++) drawTile(i); D.fullDirty = false; D.dirty.length = 0; D.dirtyFlag.fill(0); }
+  else if (D.dirty.length) { for (const i of D.dirty) { drawTile(i); D.dirtyFlag[i] = 0; } D.dirty.length = 0; }
+  if (D.terrDirty) { drawOwnership(); D.terrDirty = false; }
+
+  if (follow && sel && sel.kind === 'mob' && !sel.obj.dead) { cam.x += (sel.obj.x - cam.x) * 0.12; cam.y += (sel.obj.y - cam.y) * 0.12; }
+  const { w, h, dpr } = view, s = cam.z;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = rgb(C.deep); ctx.fillRect(0, 0, w, h);
+  const ox = w / 2 - cam.x * s, oy = h / 2 - cam.y * s;
+  ctx.imageSmoothingEnabled = s < TS;
+  ctx.drawImage(terrCv, ox, oy, W * s, H * s);
+  const tint = SEASON_TINT[seasonIdx()];
+  if (tint) { ctx.fillStyle = tint; ctx.fillRect(ox, oy, W * s, H * s); }
+  ctx.drawImage(ownCv, ox, oy, W * s, H * s);
+
+  const x0 = -ox / s - 3, y0 = -oy / s - 3, x1 = (w - ox) / s + 3, y1 = (h - oy) / s + 3;
+  for (const b of S.buildings) {
+    if (b.x + b.w < x0 || b.x > x1 || b.y + b.h < y0 || b.y > y1) continue;
+    drawBuilding(b, ox, oy, s);
+  }
+  // bewoners
+  const r0 = Math.max(1.4, s * 0.26);
+  for (const tr of S.tribes) {
+    ctx.fillStyle = tr.color; ctx.beginPath(); let any = false;
+    for (const m of S.mobs) {
+      if (m.t !== tr.id || m.asleep || m.x < x0 || m.x > x1 || m.y < y0 || m.y > y1) continue;
+      const px = ox + m.x * s, py = oy + m.y * s, r = m.age < YEAR ? r0 * 0.68 : r0;
+      ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU); any = true;
+    }
+    if (!any) continue;
+    ctx.fill();
+    if (s >= 7) { ctx.lineWidth = Math.max(1, s * 0.05); ctx.strokeStyle = 'rgba(18,20,22,.72)'; ctx.stroke(); }
+  }
+  if (s >= 6) for (const m of S.mobs) {
+    if (!m.carry || m.asleep || m.x < x0 || m.x > x1 || m.y < y0 || m.y > y1) continue;
+    const px = ox + m.x * s, py = oy + m.y * s, q = r0 * 0.85;
+    ctx.fillStyle = RES_COL[m.ctype]; ctx.fillRect(px + r0 * 0.35, py - r0 * 1.35, q, q);
+  }
+  drawSelection(ox, oy, s);
+
+  const dk = darkness(hourOf());
+  if (dk > 0.01) {
+    ctx.fillStyle = `rgba(8,14,32,${dk})`; ctx.fillRect(0, 0, w, h);
+    if (dk > 0.12) drawLights(ox, oy, s, dk, x0, y0, x1, y1);
+  }
+  drawLabels(ox, oy, s);
+}
+function drawLights(ox, oy, s, dk, x0, y0, x1, y1) {
+  const cnt = new Map();
+  for (const m of S.mobs) { if (!m.asleep) continue; const bi = D.bmap[(m.y | 0) * W + (m.x | 0)]; if (bi >= 0) cnt.set(bi, (cnt.get(bi) || 0) + 1); }
+  const a = Math.min(1, dk * 1.9);
+  for (const b of S.buildings) {
+    if (b.ruin || !b.done || b.x + b.w < x0 || b.x > x1 || b.y + b.h < y0 || b.y > y1) continue;
+    const tr = D.tribeById.get(b.t);
+    if (b.type === 'center' && tr && tr.era === 0) {
+      const cx = ox + (b.x + 1.5) * s, cy = oy + (b.y + 1.5) * s, r = s * 2.4;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(255,170,80,${0.35 * a})`); g.addColorStop(1, 'rgba(255,170,80,0)');
+      ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+    const n = Math.min(4, cnt.get(b.id) || 0); if (!n) continue;
+    ctx.fillStyle = `rgba(255,198,112,${a})`;
+    const q = Math.max(1.5, s * 0.17), bx = ox + b.x * s, by = oy + b.y * s;
+    for (let k = 0; k < n; k++) ctx.fillRect(bx + b.w * s * (0.22 + (k % 2) * 0.42), by + b.h * s * (0.25 + (k >> 1) * 0.36), q, q);
+  }
+}
+function drawSelection(ox, oy, s) {
+  if (!sel) return;
+  ctx.lineWidth = 2;
+  if (sel.kind === 'mob') {
+    const m = sel.obj; if (m.dead || m.asleep) return;
+    const px = ox + m.x * s, py = oy + m.y * s, r = Math.max(5, s * 0.6);
+    ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py, r, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    if (m.path && s >= 3) {
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(px, py);
+      for (let k = m.pi; k < m.path.length; k++) { const i = m.path[k]; ctx.lineTo(ox + ((i % W) + 0.5) * s, oy + (((i / W) | 0) + 0.5) * s); }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+  } else if (sel.kind === 'bld') {
+    const b = sel.obj; if (!D.bldById.has(b.id)) return;
+    ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 4; ctx.strokeRect(ox + b.x * s - 2, oy + b.y * s - 2, b.w * s + 4, b.h * s + 4);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(ox + b.x * s - 2, oy + b.y * s - 2, b.w * s + 4, b.h * s + 4);
+  } else {
+    const x = sel.i % W, y = (sel.i / W) | 0;
+    ctx.strokeStyle = '#fff'; ctx.strokeRect(ox + x * s, oy + y * s, s, s);
+  }
+}
+function drawLabels(ox, oy, s) {
+  if (s > 22) return;
+  ctx.font = `600 ${s < 5 ? 12 : 14}px ${FONT_C}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.lineJoin = 'round';
+  for (const tr of S.tribes) {
+    if (!tr.alive) continue;
+    const c = mainCenter(tr); if (!c) continue;
+    const px = ox + (c.x + 1.5) * s, py = oy + c.y * s - Math.max(4, s * 0.4);
+    const txt = `${tr.name} ${tr.pop}`;
+    ctx.strokeStyle = 'rgba(245,247,243,.92)'; ctx.lineWidth = 4; ctx.strokeText(txt, px, py);
+    ctx.fillStyle = '#1d282c'; ctx.fillText(txt, px, py);
+    const tw = ctx.measureText(txt).width;
+    ctx.fillStyle = tr.color; ctx.fillRect(px - tw / 2 - 11, py - 11, 7, 7);
+  }
+}
+
+// ===== PANELEN =====
+const pad2 = n => String(n).padStart(2, '0');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmtN = n => Math.floor(n).toLocaleString('nl-NL');
+const yearsOld = m => (m.age / YEAR).toFixed(1).replace('.', ',');
+const tribeEls = new Map();
+let shownSeq = 0;
+
+function updateClock() {
+  const h = hourOf(), hh = Math.floor(h), mm = Math.floor((h - hh) * 6) * 10;
+  const day = Math.floor(S.tick / DAY) % SEASON_DAYS + 1, y = Math.floor(S.tick / YEAR) + 1;
+  $('clock').innerHTML = `<b>${pad2(hh)}:${pad2(mm)}</b><span>${SEASONS[seasonIdx()]}, dag ${day}${S.harsh && seasonIdx() === 3 ? ' (streng)' : ''}</span><span>Jaar ${y}</span>`;
+}
+function updateOverview() {
+  const alive = S.tribes.filter(t => t.alive);
+  const pop = S.mobs.length, blds = S.buildings.filter(b => !b.ruin && b.done).length;
+  const top = alive.reduce((a, t) => t.era > a ? t.era : a, 0);
+  $('overview').innerHTML =
+    `<div><span>Inwoners</span><b>${fmtN(pop)}</b></div><div><span>Stammen</span><b>${alive.length}</b></div>` +
+    `<div><span>Gebouwen</span><b>${fmtN(blds)}</b></div><div class="wide"><span>Verste tijdperk</span><b>${ERAS[top].n}</b></div>`;
+}
+function makeTribeCard(tr) {
+  const el = document.createElement('div');
+  el.className = 'tribe'; el.dataset.id = tr.id;
+  el.innerHTML = `<div class="th"><span class="sw" style="background:${tr.color}"></span><span class="nm">${esc(tr.name)}</span><span class="era"></span></div>
+    <div class="tg"><div><span>Inwoners</span><b data-f="pop"></b></div><div><span>Voedsel</span><b data-f="food"></b></div><div><span>Hout</span><b data-f="wood"></b></div><div><span>Steen</span><b data-f="stone"></b></div></div>
+    <div class="bar"><i></i></div><div class="sub"></div>`;
+  el._f = { era: el.querySelector('.era'), bar: el.querySelector('.bar i'), sub: el.querySelector('.sub') };
+  el.querySelectorAll('[data-f]').forEach(n => el._f[n.dataset.f] = n);
+  return el;
+}
+function updateTribes() {
+  const host = $('tribes');
+  for (const [id, el] of tribeEls) if (!D.tribeById.has(id)) { el.remove(); tribeEls.delete(id); }
+  const list = [...S.tribes].sort((a, b) => (b.alive - a.alive) || (b.pop - a.pop) || (b.extinct - a.extinct)).slice(0, 12);
+  list.forEach((tr, k) => {
+    let el = tribeEls.get(tr.id);
+    if (!el) { el = makeTribeCard(tr); tribeEls.set(tr.id, el); }
+    if (host.children[k] !== el) host.insertBefore(el, host.children[k] || null);
+    const f = el._f;
+    if (!tr.alive) {
+      el.classList.add('dead');
+      f.era.textContent = 'Uitgestorven';
+      f.sub.textContent = `Jaar ${Math.floor(tr.extinct / YEAR) + 1}, hoogste aantal inwoners ${tr.peak}`;
+      return;
+    }
+    el.classList.remove('dead');
+    f.era.textContent = ERAS[tr.era].n;
+    f.pop.textContent = `${tr.pop} / ${tr.popCap}`;
+    f.food.textContent = fmtN(tr.stock.food); f.wood.textContent = fmtN(tr.stock.wood); f.stone.textContent = fmtN(tr.stock.stone);
+    const cur = ERAS[tr.era], nx = ERAS[tr.era + 1];
+    const parts = [];
+    if (nx) {
+      const pct = Math.max(0, Math.min(1, (tr.know - cur.need) / (nx.need - cur.need)));
+      f.bar.style.width = (pct * 100).toFixed(1) + '%';
+      parts.push(pct >= 1 && tr.pop < nx.pop ? `${nx.n} wacht op ${nx.pop} inwoners` : `${nx.n} ${Math.floor(pct * 100)}%`);
+    } else { f.bar.style.width = '100%'; parts.push('Hoogste tijdperk bereikt'); }
+    const sites = [...new Set(S.buildings.filter(b => b.t === tr.id && !b.done && !b.ruin).map(b => BDEF[b.type].n.toLowerCase()))];
+    if (sites.length) parts.push('bouwt ' + sites.join(', '));
+    else if (tr.goal) parts.push('spaart voor ' + BDEF[tr.goal].n.toLowerCase());
+    f.sub.textContent = parts.join('; ');
+  });
+}
+function taskText(m) {
+  if (m.dead) return m.cause === 'honger' ? 'Verhongerd' : m.cause === 'ziekte' ? 'Gestorven aan ziekte' : 'Gestorven van ouderdom';
+  const t = m.task;
+  if (!t) return 'Denkt na';
+  const walking = !!m.path;
+  switch (t.k) {
+    case 'gather': {
+      const v = SRC[t.src].verb;
+      if (t.eat) return walking ? 'Zoekt iets te eten' : 'Eet in het wild';
+      return walking ? `Op weg: ${v.toLowerCase()}` : v;
+    }
+    case 'deposit': return `Brengt ${m.carry} ${RES_NAME[m.ctype]} naar de opslag`;
+    case 'eat': return walking ? 'Gaat eten' : 'Eet';
+    case 'build': { const b = D.bldById.get(t.bid); return `${walking ? 'Op weg naar bouwplaats' : 'Bouwt'}: ${b ? BDEF[b.type].n.toLowerCase() : ''}`; }
+    case 'farm': { const b = D.bldById.get(t.bid); return walking ? 'Op weg naar de akker' : (b && b.stage === 2 ? 'Oogst de akker' : 'Zaait de akker'); }
+    case 'home': return 'Gaat naar huis';
+    case 'sleep': return 'Slaapt';
+    case 'wander': return m.age < YEAR ? 'Speelt' : 'Loopt rond';
+    default: return m.age < YEAR ? 'Speelt' : 'Rust uit';
+  }
+}
+const meter = (v, col) => `<div class="meter"><div class="bar"><i style="width:${Math.max(0, Math.min(100, v)).toFixed(0)}%;background:${col}"></i></div><span>${Math.round(v)}</span></div>`;
+function updateInspector() {
+  const host = $('insp'), act = $('inspActions');
+  if (!sel) { host.innerHTML = '<div class="insp-empty">Klik op een bewoner, gebouw of stuk land op de kaart.</div>'; act.hidden = true; return; }
+  if (sel.kind === 'mob') {
+    const m = sel.obj, tr = D.tribeById.get(m.t);
+    const home = D.bldById.get(m.home);
+    host.innerHTML = `<div class="insp-h"><span class="sw" style="background:${tr ? tr.color : '#888'}"></span><b>${esc(m.name)}</b><span class="era" style="color:var(--ink-2)">${tr ? esc(tr.name) : ''}</span></div>
+      <div class="kv"><span>Bezig</span><div>${esc(taskText(m))}</div>
+      <span>Leeftijd</span><div>${yearsOld(m)} jaar${m.age < YEAR ? ' (kind)' : ''}</div>
+      <span>Rol</span><div>${esc(m.role || '–')}</div>
+      <span>Honger</span>${meter(m.hunger, m.hunger > 80 ? '#b5462f' : 'var(--accent)')}
+      <span>Gezondheid</span>${meter(m.hp, m.hp < 40 ? '#b5462f' : '#4f8a4a')}
+      <span>Draagt</span><div>${m.carry ? `${m.carry} ${RES_NAME[m.ctype]}` : 'niets'}</div>
+      <span>Woont in</span><div>${home ? BDEF[home.type].n.toLowerCase() : 'geen vaste woning'}</div></div>`;
+    act.hidden = m.dead; $('btnFollow').hidden = false;
+    $('btnFollow').setAttribute('aria-pressed', follow ? 'true' : 'false');
+    $('btnFollow').textContent = follow ? 'Volgen stoppen' : 'Volgen';
+    return;
+  }
+  act.hidden = false; $('btnFollow').hidden = true;
+  if (sel.kind === 'bld') {
+    const b = sel.obj;
+    if (!D.bldById.has(b.id)) { host.innerHTML = '<div class="insp-empty">Dit gebouw bestaat niet meer.</div>'; return; }
+    const tr = D.tribeById.get(b.t), d = BDEF[b.type];
+    let rows = `<span>Staat</span><div>${b.ruin ? 'Ruïne' : b.done ? 'Gereed' : `In aanbouw, ${Math.floor(b.prog / d.work * 100)}%`}</div>`;
+    if (b.done && !b.ruin && d.cap) {
+      const res = S.mobs.filter(m => m.home === b.id);
+      rows += `<span>Bewoners</span><div>${res.length} van ${d.cap}${res.length ? ': ' + res.slice(0, 5).map(m => esc(m.name)).join(', ') : ''}</div>`;
+    }
+    if (b.type === 'farm' && b.done) rows += `<span>Gewas</span><div>${b.stage === 0 ? 'Braak, wacht op zaaien' : b.stage === 1 ? `Groeit, ${Math.floor(b.grow * 100)}%` : 'Rijp voor de oogst'}</div>`;
+    if (d.drop && b.done && !b.ruin) rows += `<span>Functie</span><div>Bewoners leveren hier grondstoffen af</div>`;
+    if (b.type === 'workshop') rows += `<span>Effect</span><div>Sneller verzamelen en bouwen</div>`;
+    if (b.type === 'school' || b.type === 'temple' || b.type === 'keep') rows += `<span>Effect</span><div>Meer kennis per dag</div>`;
+    host.innerHTML = `<div class="insp-h"><span class="sw" style="background:${tr ? tr.color : '#888'};border-radius:2px"></span><b>${d.n}</b><span style="color:var(--ink-2)">${tr ? esc(tr.name) : ''}</span></div><div class="kv">${rows}</div>`;
+    return;
+  }
+  const i = sel.i, t = S.tile[i], o = D.owner[i], tr = o >= 0 ? D.tribeById.get(o) : null;
+  let rows = `<span>Grond</span><div>${T_NAME[t]}${D.roadLv[i] >= 2 && t !== FOREST ? ', uitgesleten pad' : ''}</div>`;
+  if (t === FOREST) rows += `<span>Hout</span><div>${S.amt[i]}</div>`;
+  if (t === ROCK) rows += `<span>Steen</span><div>${S.amt[i]}</div>`;
+  if (S.bush[i] >= 0) rows += `<span>Bessen</span><div>${S.bush[i]}</div>`;
+  if (t === WATER && S.amt[i] > 0) rows += `<span>Vis</span><div>${S.amt[i]}</div>`;
+  rows += `<span>Gebied van</span><div>${tr ? esc(tr.name) : 'niemand'}</div>`;
+  host.innerHTML = `<div class="kv">${rows}</div>`;
+}
+function updateLog() {
+  const ol = $('log');
+  if (S.logSeq === shownSeq) return;
+  if (S.logSeq < shownSeq) { ol.innerHTML = ''; shownSeq = 0; }
+  const fresh = S.log.filter(e => e.seq > shownSeq);
+  for (const e of fresh) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="lt">${fmtShort(e.t)}</span><span class="ld" style="background:${e.c || 'var(--ink-2)'}"></span><span>${esc(e.m)}</span>`;
+    ol.prepend(li);
+  }
+  while (ol.children.length > 150) ol.lastChild.remove();
+  shownSeq = S.logSeq;
+}
+function renderGraph() {
+  const g = $('graph'), r = g.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (!r.width) return;
+  if (g.width !== Math.round(r.width * dpr)) { g.width = Math.round(r.width * dpr); g.height = Math.round(r.height * dpr); }
+  const c = g.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, r.width, r.height);
+  const cs = getComputedStyle(document.documentElement);
+  const ink2 = cs.getPropertyValue('--ink-2').trim(), rule = cs.getPropertyValue('--rule').trim();
+  const hs = S.hist;
+  c.font = `12px ${cs.getPropertyValue('--font')}`; c.fillStyle = ink2;
+  if (hs.length < 2) { c.fillText('De grafiek vult zich na de eerste dag.', 0, 20); return; }
+  let maxP = 10; for (const hh of hs) for (const k in hh.p) if (hh.p[k] > maxP) maxP = hh.p[k];
+  const step = maxP > 120 ? 50 : maxP > 50 ? 20 : maxP > 20 ? 10 : 5;
+  maxP = Math.ceil(maxP / step) * step;
+  const L = 28, R = r.width - 4, T = 6, B = r.height - 18;
+  c.strokeStyle = rule; c.lineWidth = 1; c.textAlign = 'right'; c.textBaseline = 'middle';
+  for (let v = 0; v <= maxP; v += step) { const y = B - (v / maxP) * (B - T); c.beginPath(); c.moveTo(L, y + 0.5); c.lineTo(R, y + 0.5); c.stroke(); c.fillText(v, L - 6, y); }
+  const t0 = hs[0].t, t1 = hs[hs.length - 1].t;
+  c.textAlign = 'left'; c.textBaseline = 'top'; c.fillText('Jaar ' + (Math.floor(t0 / YEAR) + 1), L, B + 4);
+  c.textAlign = 'right'; c.fillText('nu', R, B + 4);
+  for (const tr of S.tribes) {
+    c.strokeStyle = tr.color; c.lineWidth = 1.75; c.beginPath(); let on = false;
+    for (const hh of hs) {
+      const v = hh.p[tr.id]; if (v === undefined) { on = false; continue; }
+      const x = L + (hh.t - t0) / (t1 - t0 || 1) * (R - L), y = B - (v / maxP) * (B - T);
+      if (on) c.lineTo(x, y); else { c.moveTo(x, y); on = true; }
+    }
+    c.stroke();
+  }
+}
+
+// ===== INVOER =====
+function resize() {
+  const r = $('mapwrap').getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const first = !view.w;
+  view.w = r.width; view.h = r.height; view.dpr = dpr;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  if (first) fitView(); else camClamp();
+}
+new ResizeObserver(resize).observe($('mapwrap'));
+function zoomAt(sx, sy, f) {
+  const wx = (sx - view.w / 2) / cam.z + cam.x, wy = (sy - view.h / 2) / cam.z + cam.y;
+  cam.z = clampZ(cam.z * f);
+  cam.x = wx - (sx - view.w / 2) / cam.z; cam.y = wy - (sy - view.h / 2) / cam.z;
+  camClamp();
+}
+function pickAt(sx, sy) {
+  const s = cam.z, ox = view.w / 2 - cam.x * s, oy = view.h / 2 - cam.y * s;
+  const wx = (sx - ox) / s, wy = (sy - oy) / s;
+  const rad = Math.max(0.7, 9 / s);
+  let best = null, bd = rad * rad;
+  for (const m of S.mobs) { if (m.asleep) continue; const d = (m.x - wx) ** 2 + (m.y - wy) ** 2; if (d < bd) { bd = d; best = m; } }
+  follow = false;
+  if (best) { sel = { kind: 'mob', obj: best }; return; }
+  const tx = Math.floor(wx), ty = Math.floor(wy);
+  if (tx < 0 || ty < 0 || tx >= W || ty >= H) { sel = null; return; }
+  const i = ty * W + tx;
+  if (D.bmap[i] >= 0) sel = { kind: 'bld', obj: D.bldById.get(D.bmap[i]) };
+  else sel = { kind: 'tile', i };
+}
+const ptrs = new Map(); let downAt = null, moved = false, pinch = null;
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  if (ptrs.size === 1) { downAt = { x: e.offsetX, y: e.offsetY }; moved = false; }
+  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z: cam.z }; moved = true; }
+});
+cv.addEventListener('pointermove', e => {
+  const p = ptrs.get(e.pointerId); if (!p) return;
+  const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
+  p.x = e.offsetX; p.y = e.offsetY;
+  if (ptrs.size === 1) {
+    if (Math.hypot(e.offsetX - downAt.x, e.offsetY - downAt.y) > 4) { moved = true; follow = false; cv.classList.add('dragging'); }
+    if (moved) { cam.x -= dx / cam.z; cam.y -= dy / cam.z; camClamp(); }
+  } else if (ptrs.size === 2 && pinch) {
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, (pinch.z * d / pinch.d) / cam.z);
+  }
+});
+function endPtr(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch = null;
+  if (ptrs.size === 0) { cv.classList.remove('dragging'); if (!moved && e.type === 'pointerup') { pickAt(e.offsetX, e.offsetY); updateInspector(); } }
+}
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0016)); }, { passive: false });
+document.querySelector('.zoom').addEventListener('click', e => {
+  const z = e.target.closest('button'); if (!z) return;
+  if (z.dataset.z === 'fit') { fitView(); follow = false; } else zoomAt(view.w / 2, view.h / 2, z.dataset.z === 'in' ? 1.4 : 1 / 1.4);
+});
+$('tribes').addEventListener('click', e => {
+  const el = e.target.closest('.tribe'); if (!el) return;
+  const tr = D.tribeById.get(+el.dataset.id); if (!tr || !tr.alive) return;
+  const c = mainCenter(tr); if (!c) return;
+  follow = false; cam.x = c.x + 1.5; cam.y = c.y + 1.5; cam.z = Math.max(cam.z, 10); camClamp();
+  sel = { kind: 'bld', obj: c }; updateInspector();
+});
+$('btnFollow').addEventListener('click', () => { follow = !follow; if (follow) cam.z = Math.max(cam.z, 14); updateInspector(); });
+$('btnClear').addEventListener('click', () => { sel = null; follow = false; updateInspector(); });
+
+// snelheid
+let lastSpeed = 1;
+function setSpeed(v) {
+  if (v > 0) lastSpeed = v;
+  S.speed = v;
+  document.querySelectorAll('#speed button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.s === v ? 'true' : 'false'));
+}
+$('speed').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSpeed(+b.dataset.s); });
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); setSpeed(S.speed > 0 ? 0 : lastSpeed); }
+  else if (e.key >= '1' && e.key <= '4') setSpeed([1, 3, 10, 30][+e.key - 1]);
+  else if (e.key === 'f' && sel && sel.kind === 'mob') { follow = !follow; updateInspector(); }
+  else if (e.key === 'Escape') { sel = null; follow = false; updateInspector(); }
+  else if (e.key === '+' || e.key === '=') zoomAt(view.w / 2, view.h / 2, 1.3);
+  else if (e.key === '-') zoomAt(view.w / 2, view.h / 2, 1 / 1.3);
+});
+
+// ===== OPSLAG EN HOOFDLUS =====
+const SAVE_KEY = 'oorsprong.wereld.v1';
+let saveOk = true, lastSaveT = 0, debt = 0, lastFrame = performance.now();
+const MAX_DEBT = TPS * 3600 * 2;
+function save() {
+  try { localStorage.setItem(SAVE_KEY, serialize()); saveOk = true; }
+  catch (e) { saveOk = false; }
+  lastSaveT = Date.now();
+}
+function tryLoad() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY); if (!raw) return false;
+    const o = JSON.parse(raw); if (o.v !== 1) return false;
+    deserialize(o);
+    if (S.speed > 0 && o.savedAt) {
+      const away = Date.now() - o.savedAt;
+      debt = Math.min(MAX_DEBT, away / 1000 * TPS * S.speed);
+      if (away > 60000) {
+        const mins = Math.round(Math.min(away, MAX_DEBT / TPS / S.speed * 1000) / 60000);
+        addLog(null, `Wereld hervat na ${mins >= 60 ? Math.floor(mins / 60) + ' u ' : ''}${mins % 60} min afwezigheid`, 'world');
+      }
+    }
+    return true;
+  } catch (e) { return false; }
+}
+function newWorld() {
+  const seed = (Math.random() * 1e9) | 0;
+  const sp = S ? S.speed : 1;
+  genWorld(seed, +$('tribeCount').value);
+  S.speed = sp || 1; setSpeed(S.speed);
+  debt = 0; sel = null; follow = false;
+  for (const el of tribeEls.values()) el.remove(); tribeEls.clear();
+  $('log').innerHTML = ''; shownSeq = 0;
+  fitView(); updateAll(); save();
+}
+let armedAt = 0;
+$('btnNew').addEventListener('click', () => {
+  const b = $('btnNew');
+  if (Date.now() - armedAt < 3000) { armedAt = 0; b.textContent = 'Nieuwe wereld'; b.classList.remove('armed'); newWorld(); return; }
+  armedAt = Date.now(); b.textContent = 'Klik nogmaals om te wissen'; b.classList.add('armed');
+  setTimeout(() => { if (armedAt && Date.now() - armedAt >= 2900) { armedAt = 0; b.textContent = 'Nieuwe wereld'; b.classList.remove('armed'); } }, 3000);
+});
+
+function advance(budget) {
+  const now = performance.now(), dt = now - lastFrame; lastFrame = now;
+  if (dt > 0 && S.speed > 0) debt = Math.min(MAX_DEBT, debt + dt / 1000 * TPS * S.speed);
+  const t0 = performance.now(); let n = 0;
+  while (debt >= 1) { step(); debt -= 1; if ((++n & 15) === 0 && performance.now() - t0 > budget) break; }
+}
+function updateStatus() {
+  const banner = $('banner');
+  if (debt > TPS * 30) {
+    const m = Math.ceil(debt / TPS / 60);
+    banner.hidden = false; banner.textContent = `Wereld haalt de gemiste tijd in: nog ${m} min`;
+  } else banner.hidden = true;
+  const t = new Date(lastSaveT);
+  $('status').textContent = !saveOk ? 'Opslaan niet beschikbaar in deze omgeving' : lastSaveT ? `Opgeslagen om ${pad2(t.getHours())}:${pad2(t.getMinutes())}` : '';
+}
+function updateAll() { updateClock(); updateOverview(); updateTribes(); updateInspector(); updateLog(); updateStatus(); renderGraph(); }
+let lastUi = 0, lastGraph = 0;
+function frame() {
+  advance(debt > 300 ? 35 : 12);
+  render();
+  const now = performance.now();
+  if (now - lastUi > 250) { updateClock(); updateOverview(); updateTribes(); updateInspector(); updateLog(); updateStatus(); lastUi = now; }
+  if (now - lastGraph > 1500) { renderGraph(); lastGraph = now; }
+  if (Date.now() - lastSaveT > 20000) save();
+  requestAnimationFrame(frame);
+}
+// Op de achtergrond blijft de wereld doorlopen (browsers vertragen timers, de achterstand wordt bij terugkeer ingehaald)
+setInterval(() => { if (document.hidden) { advance(250); if (Date.now() - lastSaveT > 60000) save(); } }, 1000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+window.addEventListener('pagehide', save);
+
+if (!tryLoad()) genWorld((Math.random() * 1e9) | 0, 4);
+setSpeed(S.speed);
+$('tribeCount').value = String(Math.max(2, Math.min(6, S.tribeTarget)));
+resize(); updateAll();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
